@@ -16,11 +16,11 @@ usage() {
   echo "  -r, --resolve        Resolve group names for setup keys"
   echo
   echo "Items and Actions:"
-  echo "  accounts    list     List accounts"
+  echo "  accounts    list            List accounts"
   echo
-  echo "  events      list     List events"
+  echo "  country     list [COUNTRY]  List countries or get cities for a specific country"
   echo
-  echo "  geo         list [COUNTRY]          List countries or get cities for a specific country"
+  echo "  events      list            List events"
   echo
   echo "  groups      list [ID/NAME]          List groups or get a specific group by ID or name"
   echo "              create NAME [PEER1...]  Create a group with optional peers"
