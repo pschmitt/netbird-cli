@@ -74,7 +74,7 @@ nb_curl() {
 is_nb_id() {
   local thing="$1"
 
-  if [[ "$thing" =~ ^[0-9a-f]{20}$ && "$thing" =~ .*[0-9]+.* ]]
+  if [[ "$thing" =~ ^[0-9a-z]{20}$ && "$thing" =~ .*[0-9]+.* ]]
   then
     return 0
   fi
@@ -209,7 +209,19 @@ nb_list_peers() {
         return 1
       fi
 
-      endpoint+="/${peer_id}"
+      if [[ $(wc -l <<< "$peer_id") -eq 1 ]]
+      then
+        endpoint+="/${peer_id}"
+      else
+        echo "Multiple peers found with the name '$1'" >&2
+
+        for peer in $peer_id
+        do
+          nb_list_peers "$peer"
+        done | jq -es
+
+        return "$?"
+      fi
     fi
   fi
 
@@ -219,7 +231,7 @@ nb_list_peers() {
 nb_peer_id() {
   local peer_name="$1"
   nb_list_peers | jq -er --arg peer_name "$peer_name" '
-    .[] | select(.name == $peer_name) | .id
+    .[] | select(.hostname == $peer_name) | .id
   '
 }
 
