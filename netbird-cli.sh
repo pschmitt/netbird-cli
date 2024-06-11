@@ -938,8 +938,8 @@ main() {
       esac
       ;;
     p|peer*)
-      COLUMNS=(hostname ip dns_label connected version)
-      COLUMN_NAMES=(Hostname "Netbird IP" "DNS" Connected Version)
+      COLUMNS=(hostname ip dns_label connected version groups)
+      COLUMN_NAMES=(Hostname "Netbird IP" "DNS" Connected Version Groups)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_peers
