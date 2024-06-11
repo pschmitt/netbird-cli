@@ -570,7 +570,7 @@ main() {
             ;;
         esac
         ;;
-      geo*)
+      geo*|country*)
         case "$ACTION" in
           list|get)
             nb_list_countries "$@"
