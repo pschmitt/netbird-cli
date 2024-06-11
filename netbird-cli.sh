@@ -696,7 +696,40 @@ nb_list_users() {
     fi
   fi
 
-  nb_curl "$endpoint"
+  local data
+  if ! data=$(nb_curl "$endpoint")
+  then
+    echo "Failed to list users" >&2
+    return 1
+  fi
+
+  if [[ -z "$RESOLVE" ]]
+  then
+    printf '%s\n' "$data"
+    return 0
+  fi
+
+  local groups
+  groups=$(nb_list_groups)
+  if [[ -z "$groups" ]]
+  then
+    echo "Failed to list groups" >&2
+    return 1
+  fi
+
+  <<<"$data" jq -er --argjson groups "$groups" '
+    map(
+      . + {
+        auto_groups: (
+          .auto_groups // [] | map((
+            . as $id | $groups[] | select(.id == $id) |
+            { name: .name, id: $id }
+            // { name: "**Unknown Group**", id: $id }
+          ))
+        )
+      }
+    )
+  '
 }
 
 nb_user_id() {
@@ -875,7 +908,7 @@ main() {
     u|user*)
       # COLUMNS=(id name role auto_groups)
       # COLUMN_NAMES=(ID Name Role "Groups")
-      # FIXME the pretty output of groups is broken
+      # FIXME the pretty output of groups (arrays) is broken
       COLUMNS=(id name role)
       COLUMN_NAMES=(ID Name Role)
       case "$ACTION" in
