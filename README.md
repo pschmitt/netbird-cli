@@ -4,6 +4,7 @@ Bash wrapper for the [Netbird API](https://docs.netbird.io/api/introduction).
 
 ## Requirements
 
+- gnuawk
 - bash
 - curl
 - jq
