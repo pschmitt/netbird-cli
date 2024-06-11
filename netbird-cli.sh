@@ -13,7 +13,11 @@ usage() {
   echo "  -h, --help           Show this help message and exit"
   echo "  -u, --url <url>      Set the NetBird API URL"
   echo "  -t, --token <token>  Set the NetBird API token"
-  echo "  -j, --jq-args <args> Add arguments to jq"
+  echo "  -J, --jq-args <args> Add arguments to jq"
+  echo "  -o, --output <mode>  Set the output mode (json, pretty)"
+  echo "  -j, --json           Output raw JSON (shorthand for -o json)"
+  echo "  -N, --no-header      Do not show the header row"
+  echo "  -c, --no-color       Do not colorize the output"
   echo "  -r, --resolve        Resolve group names for setup keys"
   echo
   echo "Items and Actions:"
@@ -760,7 +764,7 @@ main() {
         NB_API_TOKEN="$2"
         shift 2
         ;;
-      --jq-args)
+      -J|--jq-args)
         JQ_ARGS+=("$2")
         shift 2
         ;;
