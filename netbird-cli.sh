@@ -978,6 +978,8 @@ main() {
       esac
       ;;
     t|token*)
+      COLUMNS=(name created_at expiration_date last_used)
+      COLUMN_NAMES=(Name "Created At" "Expires" "Last Used")
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_tokens
