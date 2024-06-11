@@ -906,11 +906,8 @@ main() {
       esac
       ;;
     u|user*)
-      # COLUMNS=(id name role auto_groups)
-      # COLUMN_NAMES=(ID Name Role "Groups")
-      # FIXME the pretty output of groups (arrays) is broken
-      COLUMNS=(id name role)
-      COLUMN_NAMES=(ID Name Role)
+      COLUMNS=(id name role auto_groups)
+      COLUMN_NAMES=(ID Name Role "Groups")
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_users
@@ -954,7 +951,14 @@ main() {
 
             . | sort_by(.["name"] | ascii_downcase) |
             map(extractFields)[] |
-            join("\t")
+            map(
+              if (. | type == "array")
+              then
+                ([.[].name] | sort | join(","))
+              else
+                .
+              end
+            ) | @tsv
           ' | \
           colorizecolumns
         } | column -t -s '	'
