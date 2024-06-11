@@ -594,7 +594,10 @@ nb_list_tokens() {
 nb_token_id() {
   local user="$1"
 
-  if ! is_nb_id "$user"
+  if [[ -z "$user" ]]
+  then
+    user=$(nb_user_id self)
+  elif ! is_nb_id "$user"
   then
     local user_id
     user_id=$(nb_user_id "$user")
@@ -739,10 +742,22 @@ nb_list_users() {
   '
 }
 
+nb_whoami() {
+  nb_list_users | \
+    jq -er '.[] | select(.is_current)'
+}
+
 nb_user_id() {
   local user_name="$1"
+
+  if [[ "$user_name" == "self" ]]
+  then
+    nb_whoami | jq -er '.id'
+    return "$?"
+  fi
+
   nb_list_users | jq -er --arg user_name "$user_name" '
-    .[] | select(.name == $user_name or .email == $user_name) | .id
+  .[] | select(.name == $user_name or .email == $user_name) | .id
   '
 }
 
@@ -774,6 +789,10 @@ main() {
         ;;
       -j|--json)
         OUTPUT=json
+        shift
+        ;;
+      -i|--id*)
+        WITH_ID_COL=1
         shift
         ;;
       -N|-no-header)
@@ -821,6 +840,9 @@ main() {
     shift
   fi
 
+  COLUMNS=(name)
+  COLUMN_NAMES=(Name)
+
   case "$API_ITEM" in
     a|acc*)
       case "$ACTION" in
@@ -851,8 +873,8 @@ main() {
       esac
       ;;
     g|gr*)
-      COLUMNS=(id name peers)
-      COLUMN_NAMES=(ID "Name" Peers)
+      COLUMNS=(name peers)
+      COLUMN_NAMES=("Name" Peers)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_groups
@@ -866,8 +888,8 @@ main() {
       esac
       ;;
     p|peer*)
-      COLUMNS=(id ip hostname connected version)
-      COLUMN_NAMES=(ID "Netbird IP" Hostname Connected Version)
+      COLUMNS=(hostname ip dns_label connected version)
+      COLUMN_NAMES=(Hostname "Netbird IP" "DNS" Connected Version)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_peers
@@ -889,8 +911,8 @@ main() {
       esac
       ;;
     s|setup*)
-      COLUMNS=(id name auto_groups state)
-      COLUMN_NAMES=(ID "Name" Groups State)
+      COLUMNS=(name auto_groups state)
+      COLUMN_NAMES=("Name" Groups State)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_setup_keys
@@ -917,11 +939,20 @@ main() {
       esac
       ;;
     u|user*)
-      COLUMNS=(id name role auto_groups)
-      COLUMN_NAMES=(ID Name Role "Groups")
+      COLUMNS=(name role auto_groups)
+      COLUMN_NAMES=(Name Role "Groups")
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_users
+          ;;
+      esac
+      ;;
+    w|whoami|self|me)
+      COLUMNS=(name role auto_groups)
+      COLUMN_NAMES=(Name Role "Groups")
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_whoami
           ;;
       esac
       ;;
@@ -930,6 +961,12 @@ main() {
   if [[ "$OUTPUT" == "pretty" ]]
   then
     RESOLVE=1
+  fi
+
+  if [[ -n "$WITH_ID_COL" ]]
+  then
+    COLUMNS=(id "${COLUMNS[@]}")
+    COLUMN_NAMES=(ID "${COLUMN_NAMES[@]}")
   fi
 
   "$COMMAND" "$@" | {
@@ -960,8 +997,14 @@ main() {
                 }
               );
 
-            . | sort_by(.["name"] | ascii_downcase) |
-            map(extractFields)[] |
+            . |
+            if (. | type == "array")
+            then
+              sort_by(.["name"] | ascii_downcase) |
+              map(extractFields)[]
+            else
+              extractFields
+            end |
             map(
               if (. | type == "array")
               then
