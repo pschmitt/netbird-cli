@@ -286,6 +286,7 @@ nb_peer_id() {
 }
 
 # https://docs.netbird.io/api/resources/posture-checks#list-all-posture-checks
+# shellcheck disable=SC2120
 nb_list_posture_checks() {
   local endpoint="posture-checks"
 
@@ -319,6 +320,7 @@ nb_posture_check_id() {
 }
 
 # https://docs.netbird.io/api/resources/routes#list-all-routes
+# shellcheck disable=SC2120
 nb_list_routes() {
   local endpoint="routes"
 
@@ -674,6 +676,7 @@ nb_delete_token() {
 }
 
 # https://docs.netbird.io/api/resources/users#list-all-users
+# shellcheck disable=SC2120
 nb_list_users() {
   local endpoint="users"
 
@@ -734,7 +737,7 @@ nb_list_users() {
 
 nb_user_id() {
   local user_name="$1"
-  nb_list_users "$1" | jq -er --arg user_name "$user_name" '
+  nb_list_users | jq -er --arg user_name "$user_name" '
     .[] | select(.name == $user_name or .email == $user_name) | .id
   '
 }
