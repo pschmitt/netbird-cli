@@ -348,7 +348,47 @@ nb_list_routes() {
     fi
   fi
 
-  nb_curl "$endpoint"
+  local data
+  if ! data=$(nb_curl "$endpoint")
+  then
+    echo "Failed to list routes" >&2
+    return 1
+  fi
+
+  if [[ -z "$RESOLVE" ]]
+  then
+    printf '%s\n' "$data"
+    return 0
+  fi
+
+  local groups
+  groups=$(nb_list_groups)
+  if [[ -z "$groups" ]]
+  then
+    echo "Failed to list groups" >&2
+    return 1
+  fi
+
+  <<<"$data" jq -er --argjson groups "$groups" '
+    map(
+      . + {
+        groups: (
+          .groups // [] | map((
+            . as $id | $groups[] | select(.id == $id) |
+            { name: .name, id: $id }
+            // { name: "**Unknown Group**", id: $id }
+          ))
+        ),
+        peer_groups: (
+          .peer_groups // [] | map((
+            . as $id | $groups[] | select(.id == $id) |
+            { name: .name, id: $id }
+            // { name: "**Unknown Group**", id: $id }
+          ))
+        )
+      }
+    )
+  '
 }
 
 nb_route_id() {
@@ -914,6 +954,8 @@ main() {
       esac
       ;;
     r|ro*)
+      COLUMNS=(network_id network masquerade metric groups peer_groups)
+      COLUMN_NAMES=("Net ID" "Network" "MASQ" "Metric" "Dist Groups" "Peer Groups")
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_routes
@@ -1010,7 +1052,7 @@ main() {
             . |
             if (. | type == "array")
             then
-              sort_by(.["name"] | ascii_downcase) |
+              sort_by((.["name"]? // .["description"]) | ascii_downcase) |
               map(extractFields)[]
             else
               extractFields
