@@ -6,23 +6,39 @@ RESOLVE="${RESOLVE:-}"
 JQ_ARGS=()
 
 usage() {
-  echo "Usage: $(basename "$0") [options] ITEM [ACTION]"
+  echo "Usage: $(basename "$0") [options] ITEM [ACTION] [ARGS...]"
   echo
   echo "Options:"
   echo "  -h, --help           Show this help message and exit"
   echo "  -u, --url <url>      Set the NetBird API URL"
   echo "  -t, --token <token>  Set the NetBird API token"
   echo "  -j, --jq-args <args> Add arguments to jq"
+  echo "  -r, --resolve        Resolve group names for setup keys"
   echo
-  echo "Items:"
-  echo "  accounts    List accounts"
-  echo "  events      List events"
-  echo "  groups      List groups"
-  echo "  peers       List peers"
-  echo "  routes      List routes"
-  echo "  setup-keys  List setup keys"
-  echo "  users       List users"
+  echo "Items and Actions:"
+  echo "  accounts    list     List accounts"
+  echo
+  echo "  events      list     List events"
+  echo
+  echo "  groups      list [ID/NAME]          List groups or get a specific group by ID or name"
+  echo "              create NAME [PEER1...]  Create a group with optional peers"
+  echo "              delete ID/NAME          Delete a group by ID or name"
+  echo
+  echo "  peers       list [ID/NAME]  List peers or get a specific peer by ID or name"
+  echo
+  echo "  routes      list [ID/NAME]  List routes or get a specific route by ID or name"
+  echo
+  echo "  setup-keys  list [ID/NAME]         List setup keys or get a specific key by ID or name"
+  echo "              create NAME [OPTIONS]  Create a setup key with the given name and options"
+  echo "              revoke ID/NAME         Revoke a setup key by ID or name"
+  echo
+  echo "  tokens      list USER                   List tokens for a specific user"
+  echo "              create USER NAME [OPTIONS]  Create a token for a user with the given name and options"
+  echo "              delete USER TOKEN           Delete a token for a user by token name or ID"
+  echo
+  echo "  users       list [ID/NAME]  List users or get a specific user by ID or name"
 }
+
 
 usage_create_setup_key() {
   echo "Usage: $(basename "$0") setup-keys create NAME [OPTIONS]"
