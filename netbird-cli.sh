@@ -20,6 +20,8 @@ usage() {
   echo
   echo "  country     list [COUNTRY]  List countries or get cities for a specific country"
   echo
+  echo "  dns         list [ID/NAME]  List nameservers groups or get a specific ns by ID or name"
+  echo
   echo "  events      list            List events"
   echo
   echo "  groups      list [ID/NAME]          List groups or get a specific group by ID or name"
@@ -27,6 +29,8 @@ usage() {
   echo "              delete ID/NAME          Delete a group by ID or name"
   echo
   echo "  peers       list [ID/NAME]          List peers or get a specific peer by ID or name"
+  echo
+  echo "  posture     list [ID/NAME]          List posture checks or get a specific check by ID or name"
   echo
   echo "  routes      list [ID/NAME]          List routes or get a specific route by ID or name"
   echo
@@ -40,7 +44,6 @@ usage() {
   echo
   echo "  users       list [ID/NAME]  List users or get a specific user by ID or name"
 }
-
 
 usage_create_setup_key() {
   echo "Usage: $(basename "$0") setup-keys create NAME [OPTIONS]"
@@ -67,6 +70,7 @@ nb_curl() {
     "$url"
 }
 
+# Check whether a provided string is a NetBird ID
 is_nb_id() {
   local thing="$1"
 
@@ -85,22 +89,26 @@ is_nb_id() {
   return 0
 }
 
+# https://docs.netbird.io/api/resources/accounts#list-all-accounts
 nb_list_accounts() {
   nb_curl accounts
 }
 
+# https://docs.netbird.io/api/resources/events#list-all-events
 nb_list_events() {
   nb_curl events
 }
 
 # https://docs.netbird.io/api/resources/groups#list-all-groups
 nb_list_groups() {
+  local endpoint="groups"
+
   if [[ -n "$1" ]]
   then
-    nb_curl "groups/${1}"
-  else
-    nb_curl groups
+    endpoint="groups/${1}"
   fi
+
+  nb_curl "$endpoint"
 }
 
 # Get the group ID, given the group name
@@ -158,46 +166,76 @@ nb_delete_group() {
   nb_curl "groups/${group}" -X DELETE
 }
 
+# https://docs.netbird.io/api/resources/geo-locations#list-all-country-codes
 nb_list_countries() {
   local endpoint="locations/countries"
 
   if [[ -n "$1" ]]
   then
-    endpoint="${endpoint}/${1}/cities"
+    endpoint+="/${1}/cities"
   fi
 
   nb_curl "$endpoint"
 }
 
-nb_list_peers() {
+# https://docs.netbird.io/api/resources/dns#list-all-nameserver-groups
+nb_list_dns() {
+  local endpoint="dns/nameservers"
+
   if [[ -n "$1" ]]
   then
-    nb_curl "peers/${1}"
+    endpoint+="/${1}"
+  fi
+
+  nb_curl "$endpoint"
+}
+
+# https://docs.netbird.io/api/resources/peers#list-all-peers
+nb_list_peers() {
+  local endpoint="peers"
+
+  if [[ -n "$1" ]]
+  then
+    endpoint+="/${1}"
+  fi
+
+  nb_curl "$endpoint"
+}
+
+# https://docs.netbird.io/api/resources/posture-checks#list-all-posture-checks
+nb_list_posture_checks() {
+  local endpoint="posture-checks"
+  if [[ -n "$1" ]]
+  then
+
+    nb_curl "posture-checks/${1}"
   else
-    nb_curl peers
+    nb_curl posture-checks
   fi
 }
 
+# https://docs.netbird.io/api/resources/routes#list-all-routes
 nb_list_routes() {
+  local endpoint="routes"
+
   if [[ -n "$1" ]]
   then
-    nb_curl "routes/${1}"
-  else
-    nb_curl routes
+    endpoint+="/${1}"
   fi
+
+  nb_curl "$endpoint"
 }
 
 # https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
 nb_list_setup_keys() {
+  local endpoint="setup-keys"
+  if [[ -n "$1" ]]
+  then
+    endpoint+="/${1}"
+  fi
+
   local data
-  if ! data=$({
-    if [[ -n "$1" ]]
-    then
-      nb_curl "setup-keys/${1}"
-    else
-      nb_curl setup-keys
-    fi
-  })
+  if ! data=$(nb_curl "$endpoint")
   then
     echo "Failed to list setup keys" >&2
     return 1
@@ -232,6 +270,7 @@ nb_list_setup_keys() {
   '
 }
 
+# https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
 nb_setup_key_id() {
   local setup_key_name="$1"
 
@@ -336,6 +375,7 @@ nb_create_setup_key() {
   nb_curl setup-keys -X POST --data-raw "$data"
 }
 
+# https://docs.netbird.io/api/resources/setup-keys#update-a-setup-key
 nb_revoke_setup_key() {
   local setup_key="$1"
 
@@ -550,6 +590,20 @@ main() {
             ;;
         esac
         ;;
+      country*|geo*)
+        case "$ACTION" in
+          list|get)
+            nb_list_countries "$@"
+            ;;
+        esac
+        ;;
+      d|dns*|ns*|nameser*)
+        case "$ACTION" in
+          list|get)
+            nb_list_dns "$@"
+            ;;
+        esac
+        ;;
       e|event*)
         case "$ACTION" in
           list|get)
@@ -570,17 +624,17 @@ main() {
             ;;
         esac
         ;;
-      geo*|country*)
-        case "$ACTION" in
-          list|get)
-            nb_list_countries "$@"
-            ;;
-        esac
-        ;;
       p|peer*)
         case "$ACTION" in
           list|get)
             nb_list_peers "$@"
+            ;;
+        esac
+        ;;
+      postu*)
+        case "$ACTION" in
+          list|get)
+            nb_list_posture_checks "$@"
             ;;
         esac
         ;;
