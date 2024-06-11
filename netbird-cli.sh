@@ -93,7 +93,7 @@ colorizecolumns() {
         # Current char
         char = substr($0, i, 1)
 
-        if (char ~ /[ \t]/) {
+        if (char ~ /[\t]/) {
           # If the character is a space or tab, just print it
           printf "%s", char
         } else {
@@ -101,7 +101,7 @@ colorizecolumns() {
           color = colors[field_count % length(colors)]
           printf "%s%s%s", color, char, reset
           # Move to the next field after a space or tab
-          if (substr($0, i + 1, 1) ~ /[ \t]/) {
+          if (substr($0, i + 1, 1) ~ /[\t]/) {
             field_count++
           }
         }
