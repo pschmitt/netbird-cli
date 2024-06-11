@@ -196,22 +196,64 @@ nb_list_peers() {
 
   if [[ -n "$1" ]]
   then
-    endpoint+="/${1}"
+    if is_nb_id "$1"
+    then
+      endpoint+="/${1}"
+    else
+      local peer_id
+      peer_id=$(nb_peer_id "$1")
+
+      if [[ -z "$peer_id" ]]
+      then
+        echo "Failed to determine peer ID of '$1'" >&2
+        return 1
+      fi
+
+      endpoint+="/${peer_id}"
+    fi
   fi
 
   nb_curl "$endpoint"
 }
 
+nb_peer_id() {
+  local peer_name="$1"
+  nb_list_peers | jq -er --arg peer_name "$peer_name" '
+    .[] | select(.name == $peer_name) | .id
+  '
+}
+
 # https://docs.netbird.io/api/resources/posture-checks#list-all-posture-checks
 nb_list_posture_checks() {
   local endpoint="posture-checks"
+
   if [[ -n "$1" ]]
   then
+    if is_nb_id "$1"
+    then
+      endpoint+="/${1}"
+    else
+      local posture_check_id
+      posture_check_id=$(nb_posture_check_id "$1")
 
-    nb_curl "posture-checks/${1}"
-  else
-    nb_curl posture-checks
+      if [[ -z "$posture_check_id" ]]
+      then
+        echo "Failed to determine posture check ID of '$1'" >&2
+        return 1
+      fi
+
+      endpoint+="/${posture_check_id}"
+    fi
   fi
+
+  nb_curl "$endpoint"
+}
+
+nb_posture_check_id() {
+  local posture_check_name="$1"
+  nb_list_posture_checks | jq -er --arg posture_check_name "$posture_check_name" '
+    .[] | select(.name == $posture_check_name) | .id
+  '
 }
 
 # https://docs.netbird.io/api/resources/routes#list-all-routes
@@ -220,10 +262,31 @@ nb_list_routes() {
 
   if [[ -n "$1" ]]
   then
-    endpoint+="/${1}"
+    if is_nb_id "$1"
+    then
+      endpoint+="/${1}"
+    else
+      local route_id
+      route_id=$(nb_route_id "$1")
+
+      if [[ -z "$route_id" ]]
+      then
+        echo "Failed to determine route ID of '$1'" >&2
+        return 1
+      fi
+
+      endpoint+="/${route_id}"
+    fi
   fi
 
   nb_curl "$endpoint"
+}
+
+nb_route_id() {
+  local route_name="$1"
+  nb_list_routes | jq -er --arg route_name "$route_name" '
+    .[] | select(.name == $route_name) | .id
+  '
 }
 
 # https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
@@ -231,7 +294,21 @@ nb_list_setup_keys() {
   local endpoint="setup-keys"
   if [[ -n "$1" ]]
   then
-    endpoint+="/${1}"
+    if is_nb_id "$1"
+    then
+      endpoint+="/${1}"
+    else
+      local setup_key_id
+      setup_key_id=$(nb_setup_key_id "$1")
+
+      if [[ -z "$setup_key_id" ]]
+      then
+        echo "Failed to determine setup key ID of '$1'" >&2
+        return 1
+      fi
+
+      endpoint+="/${setup_key_id}"
+    fi
   fi
 
   local data
@@ -412,6 +489,7 @@ nb_list_tokens() {
   then
     local user_id
     user_id=$(nb_user_id "$user")
+
     if [[ -z "$user_id" ]]
     then
       echo "Failed to determine user ID of '$user'" >&2
@@ -421,7 +499,28 @@ nb_list_tokens() {
     user="$user_id"
   fi
 
-  nb_curl "users/${user}/tokens"
+  local endpoint="users/${user}/tokens"
+
+  if [[ -n "$2" ]]
+  then
+    if is_nb_id "$2"
+    then
+      endpoint+="/${2}"
+    else
+      local token_id
+      token_id=$(nb_token_id "$user" "$2")
+
+      if [[ -z "$token_id" ]]
+      then
+        echo "Failed to determine token ID of '$2'" >&2
+        return 1
+      fi
+
+      endpoint+="/${token_id}"
+    fi
+  fi
+
+  nb_curl "$endpoint"
 }
 
 nb_token_id() {
@@ -431,6 +530,7 @@ nb_token_id() {
   then
     local user_id
     user_id=$(nb_user_id "$user")
+
     if [[ -z "$user_id" ]]
     then
       echo "Failed to determine user ID of '$user'" >&2
@@ -513,12 +613,28 @@ nb_delete_token() {
 
 # https://docs.netbird.io/api/resources/users#list-all-users
 nb_list_users() {
+  local endpoint="users"
+
   if [[ -n "$1" ]]
   then
-    nb_curl "users/${1}"
-  else
-    nb_curl users
+    if is_nb_id "$1"
+    then
+      endpoint+="/${1}"
+    else
+      local user_id
+      user_id=$(nb_user_id "$1")
+
+      if [[ -z "$user_id" ]]
+      then
+        echo "Failed to determine user ID of '$1'" >&2
+        return 1
+      fi
+
+      endpoint+="/${user_id}"
+    fi
   fi
+
+  nb_curl "$endpoint"
 }
 
 nb_user_id() {
