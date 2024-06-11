@@ -74,19 +74,19 @@ nb_curl() {
 is_nb_id() {
   local thing="$1"
 
-  # User IDs are uuids
-  local uuid_re='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-
-  if ! [[ "$thing" =~ ^[0-9a-f]{20}$ ]]
+  if [[ "$thing" =~ ^[0-9a-f]{20}$ && "$thing" =~ .*[0-9]+.* ]]
   then
-    if [[ $thing =~ $uuid_re ]]
-    then
-      return 0
-    fi
-    return 1
+    return 0
   fi
 
-  return 0
+  # User IDs are uuids
+  local uuid_re='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+  if [[ $thing =~ $uuid_re ]]
+  then
+    return 0
+  fi
+
+  return 1
 }
 
 # https://docs.netbird.io/api/resources/accounts#list-all-accounts
