@@ -887,6 +887,8 @@ main() {
       esac
       ;;
     s|setup*)
+      COLUMNS=(id name auto_groups state)
+      COLUMN_NAMES=(ID "Name" Groups State)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_setup_keys
