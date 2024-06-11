@@ -48,6 +48,7 @@ usage() {
   echo "              delete USER TOKEN           Delete a token for a user by token name or ID"
   echo
   echo "  users       list [ID/NAME]  List users or get a specific user by ID or name"
+  echo "  whoami      Get the current user"
 }
 
 usage_create_setup_key() {
@@ -553,7 +554,10 @@ nb_revoke_setup_key() {
 nb_list_tokens() {
   local user="$1"
 
-  if ! is_nb_id "$user"
+  if [[ -z "$user" ]]
+  then
+    user=$(nb_user_id self)
+  elif ! is_nb_id "$user"
   then
     local user_id
     user_id=$(nb_user_id "$user")
@@ -621,7 +625,10 @@ nb_token_id() {
 nb_create_token() {
   local user="$1"
 
-  if ! is_nb_id "$user"
+  if [[ -z "$user" ]]
+  then
+    user=$(nb_user_id self)
+  elif ! is_nb_id "$user"
   then
     local user_id
     user_id=$(nb_user_id "$user")
@@ -653,7 +660,10 @@ nb_delete_token() {
   local user="$1"
   local token="$2"
 
-  if ! is_nb_id "$user"
+  if [[ -z "$user" ]]
+  then
+    user=$(nb_user_id self)
+  elif ! is_nb_id "$user"
   then
     local user_id
     user_id=$(nb_user_id "$user")
