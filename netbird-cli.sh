@@ -3,6 +3,7 @@
 NB_API_TOKEN="${NB_API_TOKEN:-}"
 NB_API_URL="${NB_API_URL:-https://nb.gec.io}"
 RESOLVE="${RESOLVE:-}"
+OUTPUT="${OUTPUT:-pretty}"
 JQ_ARGS=()
 
 usage() {
@@ -55,6 +56,55 @@ usage_create_setup_key() {
 
 arr_to_json() {
   printf '%s\n' "$@" | jq -Rn '[inputs]'
+}
+
+# shellcheck disable=SC2120
+colorizecolumns() {
+  if [[ -n "$NO_COLOR" ]]
+  then
+    cat "$@"
+    return "$?"
+  fi
+
+  awk '
+    BEGIN {
+      # Define colors
+      colors[0] = "\033[36m" # cyan
+      colors[1] = "\033[32m" # green
+      colors[2] = "\033[35m" # magenta
+      colors[3] = "\033[37m" # white
+      colors[4] = "\033[33m" # yellow
+      colors[5] = "\033[34m" # blue
+      colors[6] = "\033[38m" # gray
+      colors[7] = "\033[31m" # red
+      reset = "\033[0m"
+    }
+
+    {
+      field_count = 0
+
+      # Process the line character by character
+      for (i = 1; i <= length($0); i++) {
+        # Current char
+        char = substr($0, i, 1)
+
+        if (char ~ /[ \t]/) {
+          # If the character is a space or tab, just print it
+          printf "%s", char
+        } else {
+          # Apply color to printable characters
+          color = colors[field_count % length(colors)]
+          printf "%s%s%s", color, char, reset
+          # Move to the next field after a space or tab
+          if (substr($0, i + 1, 1) ~ /[ \t]/) {
+            field_count++
+          }
+        }
+      }
+
+      # Append trailing NL
+      printf "\n"
+    }' "$@"
 }
 
 nb_curl() {
@@ -115,7 +165,7 @@ nb_list_groups() {
 nb_group_id() {
   local group_name="$1"
 
-  nb_list_groups | jq -er --arg group_name "$group_name" '
+  nb_list_groups "$1" | jq -er --arg group_name "$group_name" '
     .[] | select(.name == $group_name) | .id
   '
 }
@@ -651,12 +701,14 @@ nb_list_users() {
 
 nb_user_id() {
   local user_name="$1"
-  nb_list_users | jq -er --arg user_name "$user_name" '
+  nb_list_users "$1" | jq -er --arg user_name "$user_name" '
     .[] | select(.name == $user_name or .email == $user_name) | .id
   '
 }
 
 main() {
+  local ARGS=()
+
   while [[ -n "$*" ]]
   do
     case "$1" in
@@ -672,23 +724,43 @@ main() {
         NB_API_TOKEN="$2"
         shift 2
         ;;
-      -j|--jq-args)
+      --jq-args)
         JQ_ARGS+=("$2")
         shift 2
+        ;;
+      -o|--output)
+        OUTPUT="$2"
+        shift 2
+        ;;
+      -j|--json)
+        OUTPUT=json
+        shift
+        ;;
+      -N|-no-header)
+        NO_HEADER=1
+        shift
+        ;;
+      -c|--no-color)
+        NO_COLOR=1
+        shift
         ;;
       -r|--resolve)
         RESOLVE=1
         shift
         ;;
       *)
-        break
+        ARGS+=("$1")
+        shift
         ;;
     esac
   done
 
+  set -- "${ARGS[@]}"
+
   if [[ -z "$1" ]]
   then
     echo "Missing item" >&2
+    usage >&2
     exit 2
   fi
 
@@ -709,105 +781,153 @@ main() {
     shift
   fi
 
-  {
-    case "$API_ITEM" in
-      a|acc*)
-        case "$ACTION" in
-          list|get)
-            nb_list_accounts "$@"
-            ;;
-        esac
+  case "$API_ITEM" in
+    a|acc*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_accounts
+          ;;
+      esac
+      ;;
+    country*|geo*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_countries
+          ;;
+      esac
+      ;;
+    d|dns*|ns*|nameser*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_dns
+          ;;
+      esac
+      ;;
+    e|event*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_events
+          ;;
+      esac
+      ;;
+    g|gr*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_groups
+          ;;
+        create)
+          COMMAND=nb_create_group
+          ;;
+        delete)
+          COMMAND=nb_delete_group
+          ;;
+      esac
+      ;;
+    p|peer*)
+      COLUMNS=(id ip hostname connected version)
+      COLUMN_NAMES=(ID "Netbird IP" Hostname Connected Version)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_peers
+          ;;
+      esac
+      ;;
+    postu*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_posture_checks
+          ;;
+      esac
+      ;;
+    r|ro*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_routes
+          ;;
+      esac
+      ;;
+    s|setup*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_setup_keys
+          ;;
+        create)
+          COMMAND=nb_create_setup_key
+          ;;
+        delete|revoke)
+          COMMAND=nb_revoke_setup_key
+          ;;
+      esac
+      ;;
+    t|token*)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_tokens
+          ;;
+        create)
+          COMMAND=nb_create_token
+          ;;
+        delete)
+          COMMAND=nb_delete_token
+          ;;
+      esac
+      ;;
+    u|user*)
+      # COLUMNS=(id name role auto_groups)
+      # COLUMN_NAMES=(ID Name Role "Groups")
+      # FIXME the pretty output of groups is broken
+      COLUMNS=(id name role)
+      COLUMN_NAMES=(ID Name Role)
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_users
+          ;;
+      esac
+      ;;
+  esac
+
+  if [[ "$OUTPUT" == "pretty" ]]
+  then
+    RESOLVE=1
+  fi
+
+  "$COMMAND" "$@" | {
+    case "$OUTPUT" in
+      json)
+        jq -e "${JQ_ARGS[@]}"
         ;;
-      country*|geo*)
-        case "$ACTION" in
-          list|get)
-            nb_list_countries "$@"
-            ;;
-        esac
-        ;;
-      d|dns*|ns*|nameser*)
-        case "$ACTION" in
-          list|get)
-            nb_list_dns "$@"
-            ;;
-        esac
-        ;;
-      e|event*)
-        case "$ACTION" in
-          list|get)
-            nb_list_events "$@"
-            ;;
-        esac
-        ;;
-      g|gr*)
-        case "$ACTION" in
-          list|get)
-            nb_list_groups "$@"
-            ;;
-          create)
-            nb_create_group "$@"
-            ;;
-          delete)
-            nb_delete_group "$@"
-            ;;
-        esac
-        ;;
-      p|peer*)
-        case "$ACTION" in
-          list|get)
-            nb_list_peers "$@"
-            ;;
-        esac
-        ;;
-      postu*)
-        case "$ACTION" in
-          list|get)
-            nb_list_posture_checks "$@"
-            ;;
-        esac
-        ;;
-      r|ro*)
-        case "$ACTION" in
-          list|get)
-            nb_list_routes "$@"
-            ;;
-        esac
-        ;;
-      s|setup*)
-        case "$ACTION" in
-          list|get)
-            nb_list_setup_keys "$@"
-            ;;
-          create)
-            nb_create_setup_key "$@"
-            ;;
-          delete|revoke)
-            nb_revoke_setup_key "$@"
-            ;;
-        esac
-        ;;
-      t|token*)
-        case "$ACTION" in
-          list|get)
-            nb_list_tokens "$@"
-            ;;
-          create)
-            nb_create_token "$@"
-            ;;
-          delete)
-            nb_delete_token "$@"
-            ;;
-        esac
-        ;;
-      u|user*)
-        case "$ACTION" in
-          list|get)
-            nb_list_users "$@"
-            ;;
-        esac
+      pretty)
+        {
+          if [[ -z "$NO_HEADER" ]]
+          then
+            # shellcheck disable=SC2031
+            for col in "${COLUMN_NAMES[@]}"
+            do
+              echo -ne "\e[1m${col}\e[0m\t"
+            done
+            echo
+          fi
+          # shellcheck disable=SC2031
+          COLUMNS_JSON=$(arr_to_json "${COLUMNS[@]}")
+
+          jq -er --argjson cols_json "$COLUMNS_JSON" '
+            def extractFields:
+              . as $obj |
+              reduce $cols_json[] as $field (
+                {}; . + {
+                  ($field | gsub("\\."; "_")): $obj | getpath($field / ".")
+                }
+              );
+
+            . | sort_by(.["name"] | ascii_downcase) |
+            map(extractFields)[] |
+            join("\t")
+          ' | \
+          colorizecolumns
+        } | column -t -s '	'
         ;;
     esac
-  } | jq -e "${JQ_ARGS[@]}"
+  }
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]
