@@ -20,17 +20,19 @@ usage() {
   echo
   echo "  events      list     List events"
   echo
+  echo "  geo         list [COUNTRY]          List countries or get cities for a specific country"
+  echo
   echo "  groups      list [ID/NAME]          List groups or get a specific group by ID or name"
   echo "              create NAME [PEER1...]  Create a group with optional peers"
   echo "              delete ID/NAME          Delete a group by ID or name"
   echo
-  echo "  peers       list [ID/NAME]  List peers or get a specific peer by ID or name"
+  echo "  peers       list [ID/NAME]          List peers or get a specific peer by ID or name"
   echo
-  echo "  routes      list [ID/NAME]  List routes or get a specific route by ID or name"
+  echo "  routes      list [ID/NAME]          List routes or get a specific route by ID or name"
   echo
-  echo "  setup-keys  list [ID/NAME]         List setup keys or get a specific key by ID or name"
-  echo "              create NAME [OPTIONS]  Create a setup key with the given name and options"
-  echo "              revoke ID/NAME         Revoke a setup key by ID or name"
+  echo "  setup-keys  list [ID/NAME]          List setup keys or get a specific key by ID or name"
+  echo "              create NAME [OPTIONS]   Create a setup key with the given name and options"
+  echo "              revoke ID/NAME          Revoke a setup key by ID or name"
   echo
   echo "  tokens      list USER                   List tokens for a specific user"
   echo "              create USER NAME [OPTIONS]  Create a token for a user with the given name and options"
@@ -154,6 +156,17 @@ nb_delete_group() {
   fi
 
   nb_curl "groups/${group}" -X DELETE
+}
+
+nb_list_countries() {
+  local endpoint="locations/countries"
+
+  if [[ -n "$1" ]]
+  then
+    endpoint="${endpoint}/${1}/cities"
+  fi
+
+  nb_curl "$endpoint"
 }
 
 nb_list_peers() {
@@ -554,6 +567,13 @@ main() {
             ;;
           delete)
             nb_delete_group "$@"
+            ;;
+        esac
+        ;;
+      geo*)
+        case "$ACTION" in
+          list|get)
+            nb_list_countries "$@"
             ;;
         esac
         ;;
