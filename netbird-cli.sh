@@ -1062,11 +1062,14 @@ main() {
               then
                 ([.[].name] | sort | join(","))
               else
-                if (. | length) > 0
+                if (
+                  (. | type == "null") or
+                  ((. | type == "string") and ((. | length) == 0))
+                )
                 then
-                  .
+                  "N/A"
                 else
-                  "*N/A*"
+                  .
                 end
               end
             ) | @tsv
