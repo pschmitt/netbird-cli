@@ -2,6 +2,7 @@
 
 NB_API_TOKEN="${NB_API_TOKEN:-}"
 NB_API_URL="${NB_API_URL:-https://nb.gec.io}"
+RESOLVE="${RESOLVE:-}"
 JQ_ARGS=()
 
 usage() {
@@ -159,12 +160,47 @@ nb_list_routes() {
 
 # https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
 nb_list_setup_keys() {
-  if [[ -n "$1" ]]
+  local data
+  if ! data=$({
+    if [[ -n "$1" ]]
+    then
+      nb_curl "setup-keys/${1}"
+    else
+      nb_curl setup-keys
+    fi
+  })
   then
-    nb_curl "setup-keys/${1}"
-  else
-    nb_curl setup-keys
+    echo "Failed to list setup keys" >&2
+    return 1
   fi
+
+  if [[ -z "$RESOLVE" ]]
+  then
+    printf '%s\n' "$data"
+    return 0
+  fi
+
+  local groups
+  groups=$(nb_list_groups)
+  if [[ -z "$groups" ]]
+  then
+    echo "Failed to list groups" >&2
+    return 1
+  fi
+
+  <<<"$data" jq -er --argjson groups "$groups" '
+    map(
+      . + {
+        auto_groups: (
+          .auto_groups // [] | map((
+            . as $id | $groups[] | select(.id == $id) |
+            { name: .name, id: $id }
+            // { name: "**Unknown Group**", id: $id }
+          ))
+        )
+      }
+    )
+  '
 }
 
 nb_setup_key_id() {
@@ -442,6 +478,10 @@ main() {
       -j|--jq-args)
         JQ_ARGS+=("$2")
         shift 2
+        ;;
+      -r|--resolve)
+        RESOLVE=1
+        shift
         ;;
       *)
         break
