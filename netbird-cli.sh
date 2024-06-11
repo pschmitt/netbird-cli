@@ -5,7 +5,7 @@ NB_API_URL="${NB_API_URL:-https://nb.gec.io}"
 JQ_ARGS=()
 
 usage() {
-  echo "Usage: $(basename "$0") [options] ACTION"
+  echo "Usage: $(basename "$0") [options] ITEM [ACTION]"
   echo
   echo "Options:"
   echo "  -h, --help           Show this help message and exit"
@@ -13,14 +13,26 @@ usage() {
   echo "  -t, --token <token>  Set the NetBird API token"
   echo "  -j, --jq-args <args> Add arguments to jq"
   echo
-  echo "Actions:"
-  echo "  accounts           List accounts"
-  echo "  events             List events"
-  echo "  groups             List groups"
-  echo "  peers              List peers"
-  echo "  routes             List routes"
-  echo "  setup-keys         List setup keys"
-  echo "  users              List users"
+  echo "Items:"
+  echo "  accounts    List accounts"
+  echo "  events      List events"
+  echo "  groups      List groups"
+  echo "  peers       List peers"
+  echo "  routes      List routes"
+  echo "  setup-keys  List setup keys"
+  echo "  users       List users"
+}
+
+usage_create_setup_key() {
+  echo "Usage: $(basename "$0") setup-keys create NAME [OPTIONS]"
+  echo
+  echo "Options:"
+  echo "  -h, --help            Show this help message and exit"
+  echo "  -g, --auto-groups     Add the setup key to the specified groups"
+}
+
+arr_to_json() {
+  printf '%s\n' "$@" | jq -Rn '[inputs]'
 }
 
 nb_curl() {
@@ -91,7 +103,7 @@ nb_create_group() {
   local peers_json="null"
   if [[ ${#peers[@]} -gt 0 ]]
   then
-    peers_json=$(printf '%s\n' "${peers[@]}" | jq -Rn '[inputs]')
+    peers_json=$(arr_to_json "${peers[@]}")
   fi
 
   local data
@@ -155,17 +167,86 @@ nb_list_setup_keys() {
   fi
 }
 
+nb_setup_key_id() {
+  local setup_key_name="$1"
+
+  nb_list_setup_keys | jq -er --arg setup_key_name "$setup_key_name" '
+    .[] | select(.name == $setup_key_name) | .id
+  '
+}
+
 # https://docs.netbird.io/api/resources/setup-keys#create-a-setup-key
 nb_create_setup_key() {
+  local args
+  local -a auto_groups
+  local ephemeral="${ephemeral:-true}"
+  local expires_in="${expires_in:-31536000}" # 1 year
+  local revoked="${revoked:-false}"
+  local type="${type:-reusable}" # or: one-off
+  local usage_limit=0 # unlimited
+
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -h|--help|-\?)
+        usage_create_setup_key
+        return 0
+        ;;
+      -e|--ephemeral)
+        case "$2" in
+          true|t|1)
+            ephemeral=true
+            ;;
+          *)
+            ephemeral=false
+            ;;
+        esac
+        shift 2
+        ;;
+      -E|--expir*)
+        expires_in="$2"
+        shift 2
+        ;;
+      -g|--auto-groups|--group*)
+        auto_groups+=("$2")
+        shift 2
+        ;;
+      -l|--usage-limit)
+        usage_limit="$2"
+        shift 2
+        ;;
+      -r|--revoked)
+        case "$2" in
+          true|t|1)
+            revoked=true
+            ;;
+          *)
+            revoked=false
+            ;;
+        esac
+        shift 2
+        ;;
+      -t|--type)
+        type="$2"
+        shift 2
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  set -- "${args[@]}"
+
   local name="$1"
   shift
 
-  local type="${type:-reusable}" # or: one-off
-  local expires_in="${expires_in:-31536000}" # 1 year
-  local revoked="${revoked:-false}"
-  local auto_groups="${auto_groups:-[]}"
-  local usage_limit="${usage_limit:-0}" # unlimited
-  local ephemeral="${ephemeral:-true}"
+  local auto_groups_json=null
+  if [[ "${#auto_groups[@]}" -gt 0 ]]
+  then
+    auto_groups_json=$(arr_to_json "${auto_groups[@]}")
+  fi
 
   local data
   data=$(jq -Rcsn \
@@ -173,7 +254,7 @@ nb_create_setup_key() {
     --arg type "$type" \
     --argjson expires_in "$expires_in" \
     --argjson revoked "$revoked" \
-    --argjson auto_groups "$auto_groups" \
+    --argjson auto_groups "$auto_groups_json" \
     --argjson usage_limit "$usage_limit" \
     --argjson ephemeral "$ephemeral" '
       {
@@ -190,7 +271,7 @@ nb_create_setup_key() {
   nb_curl setup-keys -X POST --data-raw "$data"
 }
 
-nb_delete_setup_key() {
+nb_revoke_setup_key() {
   local setup_key="$1"
 
   if [[ -z "$setup_key" ]]
@@ -212,7 +293,10 @@ nb_delete_setup_key() {
     setup_key="$setup_key_id"
   fi
 
-  nb_curl "setup-keys/${setup_key}" -X DELETE
+  local data
+  data=$(nb_list_setup_keys "$setup_key" | jq -er '.revoked = true')
+
+  nb_curl "setup-keys/${setup_key}" -X PUT --data-raw "$data"
 }
 
 # https://docs.netbird.io/api/resources/tokens#list-all-tokens
@@ -392,21 +476,21 @@ main() {
     case "$API_ITEM" in
       a|acc*)
         case "$ACTION" in
-          list)
+          list|get)
             nb_list_accounts "$@"
             ;;
         esac
         ;;
       e|event*)
         case "$ACTION" in
-          list)
+          list|get)
             nb_list_events "$@"
             ;;
         esac
         ;;
       g|gr*)
         case "$ACTION" in
-          list)
+          list|get)
             nb_list_groups "$@"
             ;;
           create)
@@ -419,34 +503,34 @@ main() {
         ;;
       p|peer*)
         case "$ACTION" in
-          list)
+          list|get)
             nb_list_peers "$@"
             ;;
         esac
         ;;
       r|ro*)
         case "$ACTION" in
-          list)
+          list|get)
             nb_list_routes "$@"
             ;;
         esac
         ;;
       s|setup*)
         case "$ACTION" in
-          list)
+          list|get)
             nb_list_setup_keys "$@"
             ;;
           create)
             nb_create_setup_key "$@"
             ;;
-          delete)
-            nb_delete_setup_key "$@"
+          delete|revoke)
+            nb_revoke_setup_key "$@"
             ;;
         esac
         ;;
       t|token*)
         case "$ACTION" in
-          list)
+          list|get)
             nb_list_tokens "$@"
             ;;
           create)
@@ -459,7 +543,7 @@ main() {
         ;;
       u|user*)
         case "$ACTION" in
-          list)
+          list|get)
             nb_list_users "$@"
             ;;
         esac
