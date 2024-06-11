@@ -851,6 +851,8 @@ main() {
       esac
       ;;
     g|gr*)
+      COLUMNS=(id name peers)
+      COLUMN_NAMES=(ID "Name" Peers)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_groups
