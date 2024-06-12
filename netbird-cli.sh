@@ -1259,7 +1259,12 @@ main() {
             map(
               if (. | type == "array")
               then
-                ([.[].name] | sort | join(","))
+                if (. | length) > 0
+                then
+                  ([.[].name] | sort | join(","))
+                else
+                  "N/A"
+                end
               else
                 if (
                   (. | type == "null") or
