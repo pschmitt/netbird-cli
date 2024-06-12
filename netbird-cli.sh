@@ -70,7 +70,7 @@ usage_create_route() {
   echo "  -m, --metric          Metric"
   echo "  -M, --masquerade      Enable masquerade"
   echo "  -n, --network         Network CIDR"
-  echo "  -g, --group           Routing peer group(s)"
+  echo "  -g, --routing-group   Routing peer group(s)"
   echo "  -D, --dist-group      Distribution group(s)"
 
 }
@@ -473,11 +473,11 @@ nb_create_route() {
         cidr="$2"
         shift 2
         ;;
-      -g|--group*|--routing-peer-group) # routing peers
+      -g|--group*|--routing*group) # routing peers
         peer_groups+=("$2")
         shift 2
         ;;
-      -p|--peer-group*|--dist*|-D) # distribution group
+      -D|--dist*) # distribution group
         dist_groups+=("$2")
         shift 2
         ;;
