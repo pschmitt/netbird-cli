@@ -59,6 +59,22 @@ usage_create_setup_key() {
   echo "  -g, --auto-groups     Add the setup key to the specified groups"
 }
 
+usage_create_route() {
+  echo "Usage: $(basename "$0") routes create OPTIONS"
+  echo
+  echo "Options:"
+  echo "  -h, --help            Show this help message and exit"
+  echo "  -d, --description     Description of the route"
+  echo "  -i, --network-id      Network ID"
+  echo "  -e, --enabled         Enable the route"
+  echo "  -m, --metric          Metric"
+  echo "  -M, --masquerade      Enable masquerade"
+  echo "  -n, --network         Network CIDR"
+  echo "  -g, --group           Routing peer group(s)"
+  echo "  -p, --peer-group      Distribution group(s)"
+
+}
+
 arr_to_json() {
   printf '%s\n' "$@" | jq -Rn '[inputs]'
 }
@@ -155,6 +171,7 @@ nb_list_events() {
 }
 
 # https://docs.netbird.io/api/resources/groups#list-all-groups
+# shellcheck disable=SC2120
 nb_list_groups() {
   local endpoint="groups"
 
@@ -170,7 +187,7 @@ nb_list_groups() {
 nb_group_id() {
   local group_name="$1"
 
-  nb_list_groups "$1" | jq -er --arg group_name "$group_name" '
+  nb_list_groups | jq -er --arg group_name "$group_name" '
     .[] | select(.name == $group_name) | .id
   '
 }
@@ -392,9 +409,9 @@ nb_list_routes() {
 }
 
 nb_route_id() {
-  local route_name="$1"
-  nb_list_routes | jq -er --arg route_name "$route_name" '
-    .[] | select(.name == $route_name) | .id
+  local network_id="$1"
+  nb_list_routes | jq -er --arg network_id "$network_id" '
+    .[] | select(.network_id == $network_id) | .id
   '
 }
 
@@ -415,7 +432,7 @@ nb_create_route() {
   do
     case "$1" in
       -h|--help|-\?)
-        usage_create_setup_key
+        usage_create_route
         return 0
         ;;
       -d|--description)
@@ -456,11 +473,11 @@ nb_create_route() {
         cidr="$2"
         shift 2
         ;;
-      -g|--group*) # routing peers
+      -g|--group*|--routing-peer-group) # routing peers
         groups+=("$2")
         shift 2
         ;;
-      -p|--peer-group*|--distr*) # distribution group
+      -p|--peer-group*|--dist*|-D) # distribution group
         peer_groups+=("$2")
         shift 2
         ;;
@@ -472,9 +489,6 @@ nb_create_route() {
   done
 
   set -- "${args[@]}"
-
-  local name="$1"
-  shift
 
   local -a resolved_groups
   local g
@@ -526,6 +540,32 @@ nb_create_route() {
     ')
 
   nb_curl routes -X POST --data-raw "$data"
+}
+
+# https://docs.netbird.io/api/resources/routes#delete-a-route
+nb_delete_route() {
+  local route="$1"
+
+  if [[ -z "$route" ]]
+  then
+    echo "Missing route ID/name" >&2
+    return 2
+  fi
+
+  if ! is_nb_id "$route"
+  then
+    route_id=$(nb_route_id "$route")
+
+    if [[ -z "$route_id" ]]
+    then
+      echo "Failed to determine route ID of '$route'" >&2
+      return 1
+    fi
+
+    route="$route_id"
+  fi
+
+  nb_curl "routes/${route}" -X DELETE
 }
 
 # https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
@@ -978,7 +1018,7 @@ main() {
         OUTPUT=json
         shift
         ;;
-      -i|--id*)
+      -I|--id*)
         WITH_ID_COL=1
         shift
         ;;
@@ -1069,7 +1109,7 @@ main() {
         create)
           COMMAND=nb_create_group
           ;;
-        delete)
+        del|delete|rm|remove)
           COMMAND=nb_delete_group
           ;;
       esac
@@ -1100,6 +1140,9 @@ main() {
         create)
           COMMAND=nb_create_route
           ;;
+        del|delete|rm|remove)
+          COMMAND=nb_delete_route
+          ;;
       esac
       ;;
     s|setup*)
@@ -1112,7 +1155,7 @@ main() {
         create)
           COMMAND=nb_create_setup_key
           ;;
-        delete|revoke)
+        del|delete|rm|remove)
           COMMAND=nb_revoke_setup_key
           ;;
       esac
@@ -1127,7 +1170,7 @@ main() {
         create)
           COMMAND=nb_create_token
           ;;
-        delete)
+        del|delete|rm|remove)
           COMMAND=nb_delete_token
           ;;
       esac
