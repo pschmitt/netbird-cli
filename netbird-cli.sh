@@ -884,7 +884,7 @@ main() {
   shift
 
   ACTION=list
-  if [[ -n "$1" ]]
+  if [[ -n "$1" ]] && ! is_nb_id "$1"
   then
     ACTION="$1"
     shift
@@ -1009,6 +1009,10 @@ main() {
           COMMAND=nb_whoami
           ;;
       esac
+      ;;
+    *)
+      echo "Unknown object: $API_ITEM" >&2
+      return 2
       ;;
   esac
 
