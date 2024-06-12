@@ -596,6 +596,14 @@ nb_list_setup_keys() {
   local endpoint="setup-keys"
   local single
 
+  local show_all
+  case "$1" in
+    -a|--all)
+      show_all=1
+      shift
+      ;;
+  esac
+
   if [[ -n "$1" ]]
   then
     if is_nb_id "$1"
@@ -634,6 +642,16 @@ nb_list_setup_keys() {
   then
     echo "Failed to list setup keys" >&2
     return 1
+  fi
+
+  if [[ -z "$show_all" ]]
+  then
+    if [[ -n "$single" ]]
+    then
+      data=$(<<<"$data" jq -er 'select(.revoked == false)')
+    else
+      data=$(<<<"$data" jq -er '[.[] | select(.revoked == false)]')
+    fi
   fi
 
   if [[ -z "$RESOLVE" ]]
@@ -1304,8 +1322,8 @@ main() {
       esac
       ;;
     s|setup*)
-      COLUMNS=(name auto_groups state)
-      COLUMN_NAMES=("Name" Groups State)
+      COLUMNS=(name auto_groups state key)
+      COLUMN_NAMES=("Name" Groups State Key)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_setup_keys
