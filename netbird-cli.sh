@@ -1219,14 +1219,20 @@ main() {
         ;;
       pretty)
         {
+          JSON_DATA=$(cat)
+          if [[ -z "$JSON_DATA" ]]
+          then
+            return 1
+          fi
           # Do nothing if we delete something
           # The NB API returns '{}' on deletion
           case "$ACTION" in
             del|delete|rm|remove)
-              jq -e
+              jq -e <<< "$JSON_DATA"
               exit "${PIPESTATUS[0]}"
               ;;
           esac
+
           if [[ -z "$NO_HEADER" ]]
           then
             # shellcheck disable=SC2031
@@ -1239,7 +1245,7 @@ main() {
           # shellcheck disable=SC2031
           COLUMNS_JSON=$(arr_to_json "${COLUMNS[@]}")
 
-          jq -er --argjson cols_json "$COLUMNS_JSON" '
+          <<<"$JSON_DATA" jq -er --argjson cols_json "$COLUMNS_JSON" '
             def extractFields:
               . as $obj |
               reduce $cols_json[] as $field (
