@@ -1248,6 +1248,8 @@ main() {
                 }
               );
 
+            "N/A" as $NA |
+
             . |
             if (. | type == "array")
             then
@@ -1257,24 +1259,22 @@ main() {
               extractFields
             end |
             map(
-              if (. | type == "array")
+              if (
+                  (. | type == "null") or
+                  ((. | type == "string") and ((. | length) == 0))
+                )
+              then
+                $NA
+              elif (. | type == "array")
               then
                 if (. | length) > 0
                 then
                   ([.[].name] | sort | join(","))
                 else
-                  "N/A"
+                  $NA
                 end
               else
-                if (
-                  (. | type == "null") or
-                  ((. | type == "string") and ((. | length) == 0))
-                )
-                then
-                  "N/A"
-                else
-                  .
-                end
+                .
               end
             ) | @tsv
           ' | \
