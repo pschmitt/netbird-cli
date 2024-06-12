@@ -594,6 +594,8 @@ nb_delete_route() {
 # https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
 nb_list_setup_keys() {
   local endpoint="setup-keys"
+  local single
+
   if [[ -n "$1" ]]
   then
     if is_nb_id "$1"
@@ -609,7 +611,21 @@ nb_list_setup_keys() {
         return 1
       fi
 
-      endpoint+="/${setup_key_id}"
+      if [[ $(wc -l <<< "$setup_key_id") -eq 1 ]]
+      then
+        endpoint+="/${setup_key_id}"
+        single=1
+      else
+        echo "Multiple setup-keys found with name '$1'" >&2
+
+        local setup_key
+        for setup_key in $setup_key_id
+        do
+          nb_list_setup_keys "$setup_key"
+        done
+
+        return "$?"
+      fi
     fi
   fi
 
@@ -634,7 +650,7 @@ nb_list_setup_keys() {
     return 1
   fi
 
-  <<<"$data" jq -er --argjson groups "$groups" '
+  <<<"$data" jq -er ${single:+-s} --argjson groups "$groups" '
     map(
       . + {
         auto_groups: (
@@ -651,6 +667,13 @@ nb_list_setup_keys() {
 
 # https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
 nb_setup_key_id() {
+  # Setup Keys IDS are 9 digits or more
+  if [[ "$1" =~ ^[0-9]{9,}$ ]]
+  then
+    echo "$1"
+    return 0
+  fi
+
   local setup_key_name="$1"
 
   nb_list_setup_keys | jq -er --arg setup_key_name "$setup_key_name" '
@@ -842,10 +865,12 @@ nb_update_setup_key() {
     # Resolve groups
     local -a resolved_groups
     local g
+
     for g in "${auto_groups[@]}"
     do
       resolved_groups+=("$(nb_group_id "$g")")
     done
+
     auto_groups_json=$(arr_to_json "${resolved_groups[@]}")
   fi
 
@@ -1387,7 +1412,7 @@ main() {
             . |
             if (. | type == "array")
             then
-              sort_by((.["name"]? // .["description"]) | ascii_downcase) |
+              sort_by((.["name"]? // .["network_id"]? // .["description"]?) | ascii_downcase) |
               map(extractFields)[]
             else
               extractFields
