@@ -13,6 +13,6 @@ Bash wrapper for the [Netbird API](https://docs.netbird.io/api/introduction).
 
 ```shell
 export NB_API_TOKEN=your_api_key
-export NB_API_URL=https://api.netbird.io
+export NB_MANAGEMENT_URL=https://api.netbird.io
 ./netbird-cli.sh -h
 ```

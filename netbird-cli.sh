@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 NB_API_TOKEN="${NB_API_TOKEN:-}"
-NB_API_URL="${NB_API_URL:-https://nb.gec.io}"
+NB_MANAGEMENT_URL="${NB_MANAGEMENT_URL:-https://api.netbird.cloud}"
 RESOLVE="${RESOLVE:-}"
 OUTPUT="${OUTPUT:-pretty}"
 JQ_ARGS=()
@@ -133,7 +133,7 @@ colorizecolumns() {
 nb_curl() {
   local endpoint="$1"
   shift
-  local url="${NB_API_URL}/api/${endpoint}"
+  local url="${NB_MANAGEMENT_URL}/api/${endpoint}"
 
   curl -fsSL \
     -H "Authorization: Token $NB_API_TOKEN" \
@@ -1177,7 +1177,7 @@ main() {
         exit 0
         ;;
       -u|--url)
-        NB_API_URL="$2"
+        NB_MANAGEMENT_URL="$2"
         shift 2
         ;;
       -t|--token)

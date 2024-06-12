@@ -1,2 +1,2 @@
+export NB_MANAGEMENT_URL=https://api.netbird.io
 export NB_API_TOKEN=nbp_xxxxxxxxxx
-export NB_API_URL=https://api.netbird.io
