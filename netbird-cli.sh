@@ -398,6 +398,136 @@ nb_route_id() {
   '
 }
 
+# https://docs.netbird.io/api/resources/routes#create-a-route
+nb_create_route() {
+  local args
+
+  local description
+  local network_id  # max 40 chars
+  local enabled=true
+  local -a groups peer_groups
+  local metric
+  local cidr
+  local masq=true
+  local metric=9999
+
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -h|--help|-\?)
+        usage_create_setup_key
+        return 0
+        ;;
+      -d|--description)
+        description="$2"
+        shift 2
+        ;;
+      -i|--network-id)
+        network_id="$2"
+        shift 2
+        ;;
+      -e|--enabled)
+        case "$2" in
+          true|t|1)
+            enabled=true
+            ;;
+          *)
+            enabled=false
+            ;;
+        esac
+        shift 2
+        ;;
+      -m|--metric)
+        metric="$2"
+        shift 2
+        ;;
+      -M|--masq*)
+        case "$2" in
+          true|t|1)
+            masq=true
+            ;;
+          *)
+            masq=false
+            ;;
+        esac
+        shift 2
+        ;;
+      -n|--network|--cidr)
+        cidr="$2"
+        shift 2
+        ;;
+      -g|--group*) # routing peers
+        groups+=("$2")
+        shift 2
+        ;;
+      -p|--peer-group*|--distr*) # distribution group
+        peer_groups+=("$2")
+        shift 2
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  set -- "${args[@]}"
+
+  local name="$1"
+  shift
+
+  local -a resolved_groups
+  local g
+
+  local groups_json=null
+  if [[ "${#groups[@]}" -gt 0 ]]
+  then
+    # Resolve groups
+    for g in "${groups[@]}"
+    do
+      resolved_groups+=("$(nb_group_id "$g")")
+    done
+    groups_json=$(arr_to_json "${resolved_groups[@]}")
+    # Reset array
+    resolved_groups=()
+  fi
+
+  local peer_groups_json=null
+  if [[ "${#peer_groups[@]}" -gt 0 ]]
+  then
+    # Resolve groups
+    for g in "${peer_groups[@]}"
+    do
+      resolved_groups+=("$(nb_group_id "$g")")
+    done
+    peer_groups_json=$(arr_to_json "${resolved_groups[@]}")
+  fi
+
+  local data
+  data=$(jq -Rcsn \
+    --arg network_id "$network_id" \
+    --arg description "$description" \
+    --arg network "$cidr" \
+    --argjson peer_groups "$peer_groups_json" \
+    --argjson groups "$groups_json" \
+    --argjson metric "$metric" \
+    --argjson masquerade "$masq" \
+    --argjson enabled "$enabled" '
+      {
+        description: $description,
+        network_id: $network_id,
+        enabled: $enabled,
+        peer_groups: $peer_groups,
+        network: $network,
+        metric: $metric,
+        masquerade: $masquerade,
+        groups: $groups,
+      }
+    ')
+
+  nb_curl routes -X POST --data-raw "$data"
+}
+
 # https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
 nb_list_setup_keys() {
   local endpoint="setup-keys"
@@ -535,7 +665,14 @@ nb_create_setup_key() {
   local auto_groups_json=null
   if [[ "${#auto_groups[@]}" -gt 0 ]]
   then
-    auto_groups_json=$(arr_to_json "${auto_groups[@]}")
+    # Resolve groups
+    local -a resolved_groups
+    local g
+    for g in "${auto_groups[@]}"
+    do
+      resolved_groups+=("$(nb_group_id "$g")")
+    done
+    auto_groups_json=$(arr_to_json "${resolved_groups[@]}")
   fi
 
   local data
@@ -959,6 +1096,9 @@ main() {
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_routes
+          ;;
+        create)
+          COMMAND=nb_create_route
           ;;
       esac
       ;;
