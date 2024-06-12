@@ -200,9 +200,18 @@ nb_create_group() {
 
   local peers=("$@")
   local peers_json="null"
+
   if [[ ${#peers[@]} -gt 0 ]]
   then
-    peers_json=$(arr_to_json "${peers[@]}")
+    local -a resolved_peers
+    local p
+
+    for p in "${peers[@]}"
+    do
+      resolved_peers+=("$(nb_peer_id "$p")")
+    done
+
+    peers_json=$(arr_to_json "${resolved_peers[@]}")
   fi
 
   local data
@@ -1220,18 +1229,10 @@ main() {
       pretty)
         {
           JSON_DATA=$(cat)
-          if [[ -z "$JSON_DATA" ]]
+          if [[ -z "$JSON_DATA" || "$JSON_DATA" == "{}" ]]
           then
             return 1
           fi
-          # Do nothing if we delete something
-          # The NB API returns '{}' on deletion
-          case "$ACTION" in
-            del|delete|rm|remove)
-              jq -e <<< "$JSON_DATA"
-              exit "${PIPESTATUS[0]}"
-              ;;
-          esac
 
           if [[ -z "$NO_HEADER" ]]
           then
