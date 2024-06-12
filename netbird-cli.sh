@@ -1477,7 +1477,12 @@ main() {
               then
                 if (. | length) > 0
                 then
-                  ([.[].name] | sort | join(","))
+                  if all(.[]; type == "object" and has("name"))
+                  then
+                    ([.[].name] | sort | join(","))
+                  else
+                    (. | join(", "))
+                  end
                 else
                   $NA
                 end
