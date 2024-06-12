@@ -1380,10 +1380,16 @@ main() {
       ;;
   esac
 
-  if [[ "$OUTPUT" == "pretty" ]]
-  then
-    RESOLVE=1
-  fi
+  case "$OUTPUT" in
+    pretty)
+      RESOLVE=1
+      ;;
+    plain)
+      RESOLVE=1
+      NO_COLOR=1
+      OUTPUT=pretty
+      ;;
+  esac
 
   if [[ -n "$WITH_ID_COL" ]]
   then
@@ -1418,7 +1424,12 @@ main() {
             # shellcheck disable=SC2031
             for col in "${COLUMN_NAMES[@]}"
             do
-              echo -ne "\e[1m${col}\e[0m\t"
+              if [[ -n "$NO_COLOR" ]]
+              then
+                echo -ne "${col}\t"
+              else
+                echo -ne "\e[1m${col}\e[0m\t"
+              fi
             done
             echo
           fi
