@@ -1416,9 +1416,18 @@ main() {
       pretty)
         {
           JSON_DATA=$(cat)
-          if [[ -z "$JSON_DATA" || "$JSON_DATA" == "{}" ]]
+          if [[ -z "$JSON_DATA" ]]
           then
             return 1
+          elif [[ "$JSON_DATA" == "{}" || "$JSON_DATA" == "[]" ]]
+          then
+            return 0
+          fi
+
+          # Convert JSON_DATA to array if it contains only one object
+          if <<<"$data" jq -er '(. | type) == "object"' &>/dev/null
+          then
+            JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
           fi
 
           if [[ -z "$NO_HEADER" ]]
