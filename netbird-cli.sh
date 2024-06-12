@@ -71,7 +71,7 @@ usage_create_route() {
   echo "  -M, --masquerade      Enable masquerade"
   echo "  -n, --network         Network CIDR"
   echo "  -g, --group           Routing peer group(s)"
-  echo "  -p, --peer-group      Distribution group(s)"
+  echo "  -D, --dist-group      Distribution group(s)"
 
 }
 
@@ -422,7 +422,7 @@ nb_create_route() {
   local description
   local network_id  # max 40 chars
   local enabled=true
-  local -a groups peer_groups
+  local -a dist_groups peer_groups
   local metric
   local cidr
   local masq=true
@@ -474,11 +474,11 @@ nb_create_route() {
         shift 2
         ;;
       -g|--group*|--routing-peer-group) # routing peers
-        groups+=("$2")
+        peer_groups+=("$2")
         shift 2
         ;;
       -p|--peer-group*|--dist*|-D) # distribution group
-        peer_groups+=("$2")
+        dist_groups+=("$2")
         shift 2
         ;;
       *)
@@ -493,15 +493,15 @@ nb_create_route() {
   local -a resolved_groups
   local g
 
-  local groups_json=null
-  if [[ "${#groups[@]}" -gt 0 ]]
+  local dist_groups_json=null
+  if [[ "${#dist_groups[@]}" -gt 0 ]]
   then
     # Resolve groups
-    for g in "${groups[@]}"
+    for g in "${dist_groups[@]}"
     do
       resolved_groups+=("$(nb_group_id "$g")")
     done
-    groups_json=$(arr_to_json "${resolved_groups[@]}")
+    dist_groups_json=$(arr_to_json "${resolved_groups[@]}")
     # Reset array
     resolved_groups=()
   fi
@@ -523,7 +523,7 @@ nb_create_route() {
     --arg description "$description" \
     --arg network "$cidr" \
     --argjson peer_groups "$peer_groups_json" \
-    --argjson groups "$groups_json" \
+    --argjson groups "$dist_groups_json" \
     --argjson metric "$metric" \
     --argjson masquerade "$masq" \
     --argjson enabled "$enabled" '
