@@ -370,6 +370,7 @@ nb_posture_check_id() {
 # shellcheck disable=SC2120
 nb_list_routes() {
   local endpoint="routes"
+  local single
 
   if [[ -n "$1" ]]
   then
@@ -386,6 +387,7 @@ nb_list_routes() {
         return 1
       fi
 
+      single=1
       endpoint+="/${route_id}"
     fi
   fi
@@ -411,7 +413,7 @@ nb_list_routes() {
     return 1
   fi
 
-  <<<"$data" jq -er --argjson groups "$groups" '
+  <<<"$data" jq -er ${single:+-s} --argjson groups "$groups" '
     map(
       . + {
         groups: (
