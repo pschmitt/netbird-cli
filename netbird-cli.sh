@@ -177,7 +177,21 @@ nb_list_groups() {
 
   if [[ -n "$1" ]]
   then
-    endpoint="groups/${1}"
+    if is_nb_id "$1"
+    then
+      endpoint+="/${1}"
+    else
+      local group_id
+      group_id=$(nb_group_id "$1")
+
+      if [[ -z "$group_id" ]]
+      then
+        echo "Failed to determine group ID of '$1'" >&2
+        return 1
+      fi
+
+      endpoint+="/${group_id}"
+    fi
   fi
 
   nb_curl "$endpoint"
