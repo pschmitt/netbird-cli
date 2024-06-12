@@ -1210,6 +1210,8 @@ main() {
     COLUMN_NAMES=(ID "${COLUMN_NAMES[@]}")
   fi
 
+  set -o pipefail
+
   "$COMMAND" "$@" | {
     case "$OUTPUT" in
       json)
@@ -1217,6 +1219,14 @@ main() {
         ;;
       pretty)
         {
+          # Do nothing if we delete something
+          # The NB API returns '{}' on deletion
+          case "$ACTION" in
+            del|delete|rm|remove)
+              jq -e
+              exit "${PIPESTATUS[0]}"
+              ;;
+          esac
           if [[ -z "$NO_HEADER" ]]
           then
             # shellcheck disable=SC2031
