@@ -38,9 +38,11 @@ usage() {
   echo "  posture     list [ID/NAME]          List posture checks or get a specific check by ID or name"
   echo
   echo "  routes      list [ID/NAME]          List routes or get a specific route by ID or name"
+  echo "              delete ID/NAME          Delete a route by ID or name"
   echo
   echo "  setup-keys  list [ID/NAME]          List setup keys or get a specific key by ID or name"
   echo "              create NAME [OPTIONS]   Create a setup key with the given name and options"
+  echo "              update NAME [OPTIONS]   Update an existing setup key"
   echo "              revoke ID/NAME          Revoke a setup key by ID or name"
   echo
   echo "  tokens      list USER                   List tokens for a specific user"
@@ -1387,6 +1389,13 @@ main() {
   then
     COLUMNS=(id "${COLUMNS[@]}")
     COLUMN_NAMES=(ID "${COLUMN_NAMES[@]}")
+  fi
+
+  if [[ -z "$COMMAND" ]]
+  then
+    echo "No command provided" >&2
+    usage >&2
+    return 2
   fi
 
   set -o pipefail
