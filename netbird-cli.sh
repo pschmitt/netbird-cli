@@ -3,6 +3,7 @@
 NB_API_TOKEN="${NB_API_TOKEN:-}"
 NB_MANAGEMENT_URL="${NB_MANAGEMENT_URL:-https://api.netbird.cloud}"
 
+DEBUG="${DEBUG:-}"
 RESOLVE="${RESOLVE:-}"
 OUTPUT="${OUTPUT:-pretty}"
 NO_COLOR="${NO_COLOR:-}"
@@ -78,7 +79,32 @@ usage_create_route() {
   echo "  -n, --network         Network CIDR"
   echo "  -g, --routing-group   Routing peer group(s)"
   echo "  -D, --dist-group      Distribution group(s)"
+}
 
+echo_info() {
+  echo -e "\e[1m\e[34mINF\e[0m $*" >&2
+}
+
+echo_success() {
+  echo -e "\e[1m\e[32mOK\e[0m $*" >&2
+}
+
+echo_warning() {
+  [[ -n "$NO_WARNING" ]] && return 0
+  echo -e "\e[1m\e[33mWRN\e[0m $*" >&2
+}
+
+echo_error() {
+  echo -e "\e[1m\e[31mERR\e[0m $*" >&2
+}
+
+echo_debug() {
+  [[ -z "${DEBUG}${VERBOSE}" ]] && return 0
+  echo -e "\e[1m\e[35mDBG\e[0m $*" >&2
+}
+
+echo_dryrun() {
+  echo -e "\e[1m\e[35mDRY\e[0m $*" >&2
 }
 
 arr_to_json() {
@@ -132,6 +158,11 @@ colorizecolumns() {
       # Append trailing NL
       printf "\n"
     }' "$@"
+}
+
+curl() {
+  echo_debug "\$ curl ${*@Q}"
+  command curl "$@"
 }
 
 nb_curl() {
@@ -192,7 +223,7 @@ nb_list_groups() {
 
       if [[ -z "$group_id" ]]
       then
-        echo "Failed to determine group ID of '$1'" >&2
+        echo_error "Failed to determine group ID of '$1'"
         return 1
       fi
 
@@ -220,7 +251,7 @@ nb_resolve_groups() {
 
   if [[ -z "$groups" ]]
   then
-    echo "Failed to list groups" >&2
+    echo_error "Failed to list groups"
     return 1
   fi
 
@@ -282,7 +313,7 @@ nb_delete_group() {
 
   if [[ -z "$group" ]]
   then
-    echo "Missing group ID/name" >&2
+    echo_error "Missing group ID/name"
     return 2
   fi
 
@@ -292,7 +323,7 @@ nb_delete_group() {
 
     if [[ -z "$group_id" ]]
     then
-      echo "Failed to determine group ID of '$group'" >&2
+      echo_error "Failed to determine group ID of '$group'"
       return 1
     fi
 
@@ -341,7 +372,7 @@ nb_list_peers() {
 
       if [[ -z "$peer_id" ]]
       then
-        echo "Failed to determine peer ID of '$1'" >&2
+        echo_error "Failed to determine peer ID of '$1'"
         return 1
       fi
 
@@ -349,7 +380,7 @@ nb_list_peers() {
       then
         endpoint+="/${peer_id}"
       else
-        echo "Multiple peers found with the name '$1'" >&2
+        echo_warning "Multiple peers found with the name '$1'"
 
         for peer in $peer_id
         do
@@ -387,7 +418,7 @@ nb_list_posture_checks() {
 
       if [[ -z "$posture_check_id" ]]
       then
-        echo "Failed to determine posture check ID of '$1'" >&2
+        echo_error "Failed to determine posture check ID of '$1'"
         return 1
       fi
 
@@ -422,7 +453,7 @@ nb_list_routes() {
 
       if [[ -z "$route_id" ]]
       then
-        echo "Failed to determine route ID of '$1'" >&2
+        echo_error "Failed to determine route ID of '$1'"
         return 1
       fi
 
@@ -434,7 +465,7 @@ nb_list_routes() {
   local data
   if ! data=$(nb_curl "$endpoint")
   then
-    echo "Failed to list routes" >&2
+    echo_error "Failed to list routes"
     return 1
   fi
 
@@ -581,7 +612,7 @@ nb_delete_route() {
 
   if [[ -z "$route" ]]
   then
-    echo "Missing route ID/name" >&2
+    echo_error "Missing route ID/name"
     return 2
   fi
 
@@ -591,7 +622,7 @@ nb_delete_route() {
 
     if [[ -z "$route_id" ]]
     then
-      echo "Failed to determine route ID of '$route'" >&2
+      echo_error "Failed to determine route ID of '$route'"
       return 1
     fi
 
@@ -625,7 +656,7 @@ nb_list_setup_keys() {
 
       if [[ -z "$setup_key_id" ]]
       then
-        echo "Failed to determine setup key ID of '$1'" >&2
+        echo_error "Failed to determine setup key ID of '$1'"
         return 1
       fi
 
@@ -634,7 +665,7 @@ nb_list_setup_keys() {
         endpoint+="/${setup_key_id}"
         single=1
       else
-        echo "Multiple setup-keys found with name '$1'" >&2
+        echo_error "Multiple setup-keys found with name '$1'"
 
         local setup_key
         for setup_key in $setup_key_id
@@ -650,7 +681,7 @@ nb_list_setup_keys() {
   local data
   if ! data=$(nb_curl "$endpoint")
   then
-    echo "Failed to list setup keys" >&2
+    echo_error "Failed to list setup keys"
     return 1
   fi
 
@@ -857,7 +888,7 @@ nb_update_setup_key() {
   setup_key_id=$(nb_setup_key_id "$name")
   if [[ -z "$setup_key_id" ]]
   then
-    echo "Failed to determine setup key ID of '$name'" >&2
+    echo_error "Failed to determine setup key ID of '$name'"
     return 1
   fi
 
@@ -904,7 +935,7 @@ nb_revoke_setup_key() {
 
   if [[ -z "$setup_key" ]]
   then
-    echo "Missing setup_key ID/name" >&2
+    echo "Missing setup_key ID/name"
     return 2
   fi
 
@@ -914,7 +945,7 @@ nb_revoke_setup_key() {
 
     if [[ -z "$setup_key_id" ]]
     then
-      echo "Failed to determine setup key ID of '$setup_key'" >&2
+      echo_error "Failed to determine setup key ID of '$setup_key'"
       return 1
     fi
 
@@ -941,7 +972,7 @@ nb_list_tokens() {
 
     if [[ -z "$user_id" ]]
     then
-      echo "Failed to determine user ID of '$user'" >&2
+      echo_error "Failed to determine user ID of '$user'"
       return 1
     fi
 
@@ -961,7 +992,7 @@ nb_list_tokens() {
 
       if [[ -z "$token_id" ]]
       then
-        echo "Failed to determine token ID of '$2'" >&2
+        echo_error "Failed to determine token ID of '$2'"
         return 1
       fi
 
@@ -985,7 +1016,7 @@ nb_token_id() {
 
     if [[ -z "$user_id" ]]
     then
-      echo "Failed to determine user ID of '$user'" >&2
+      echo_error "Failed to determine user ID of '$user'"
       return 1
     fi
 
@@ -1011,7 +1042,7 @@ nb_create_token() {
     user_id=$(nb_user_id "$user")
     if [[ -z "$user_id" ]]
     then
-      echo "Failed to determine user ID of '$user'" >&2
+      echo_error "Failed to determine user ID of '$user'"
       return 1
     fi
 
@@ -1046,7 +1077,7 @@ nb_delete_token() {
     user_id=$(nb_user_id "$user")
     if [[ -z "$user_id" ]]
     then
-      echo "Failed to determine user ID of '$user'" >&2
+      echo_error "Failed to determine user ID of '$user'"
       return 1
     fi
 
@@ -1059,7 +1090,7 @@ nb_delete_token() {
     token_id=$(nb_token_id "$user" "$token")
     if [[ -z "$token_id" ]]
     then
-      echo "Failed to determine token ID of '$token'" >&2
+      echo_error "Failed to determine token ID of '$token'"
       return 1
     fi
 
@@ -1085,7 +1116,7 @@ nb_list_users() {
 
       if [[ -z "$user_id" ]]
       then
-        echo "Failed to determine user ID of '$1'" >&2
+        echo_error "Failed to determine user ID of '$1'"
         return 1
       fi
 
@@ -1096,7 +1127,7 @@ nb_list_users() {
   local data
   if ! data=$(nb_curl "$endpoint")
   then
-    echo "Failed to list users" >&2
+    echo_error "Failed to list users"
     return 1
   fi
 
@@ -1131,6 +1162,10 @@ main() {
       -h|--help)
         usage
         exit 0
+        ;;
+      --debug)
+        DEBUG=1
+        shift
         ;;
       -u|--url)
         NB_MANAGEMENT_URL="$2"
@@ -1184,15 +1219,15 @@ main() {
 
   if [[ -z "$1" ]]
   then
-    echo "Missing item" >&2
+    echo_error "Missing item"
     usage >&2
     exit 2
   fi
 
   if [[ -z "$NB_API_TOKEN" ]]
   then
-    echo "Missing API token" >&2
-    echo "Either set NB_API_TOKEN or use the -t option" >&2
+    echo_error "Missing API token"
+    echo_error "Either set NB_API_TOKEN or use the -t option"
     exit 2
   fi
 
@@ -1336,7 +1371,7 @@ main() {
       esac
       ;;
     *)
-      echo "Unknown object: $API_ITEM" >&2
+      echo_error "Unknown object: $API_ITEM"
       return 2
       ;;
   esac
@@ -1348,7 +1383,7 @@ main() {
     field)
       if [[ -z "$FIELD" ]]
       then
-        echo "Output set to field but no field name provided" >&2
+        echo_error "Output set to field but no field name provided"
         return 2
       fi
       ;;
