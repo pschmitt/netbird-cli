@@ -1387,8 +1387,8 @@ main() {
       esac
       ;;
     g|gr*)
-      JSON_COLUMNS=(name peers)
-      COLUMN_NAMES=("Name" Peers)
+      JSON_COLUMNS=(name peers_count peers)
+      COLUMN_NAMES=("Name" "Peer count" Peers)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_groups
