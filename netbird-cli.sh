@@ -1352,6 +1352,17 @@ main() {
       esac
       ;;
     country*|geo*)
+      if [[ -z "$*" ]]
+      then
+        JSON_COLUMNS=(country_code country_name)
+        COLUMN_NAMES=(Code Name)
+        [[ -z "$CUSTOM_SORT" ]] && SORT_BY=country_name
+      else
+        JSON_COLUMNS=(city_name geoname_id)
+        COLUMN_NAMES=(City "Geo ID")
+        # FIXME This does result in öäü etc being sorted after 'z'
+        [[ -z "$CUSTOM_SORT" ]] && SORT_BY=city_name
+      fi
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_countries
