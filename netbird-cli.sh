@@ -1158,6 +1158,73 @@ nb_user_id() {
   '
 }
 
+pretty_output() {
+  local columns_json_arr
+  columns_json_arr=$(arr_to_json "${JSON_COLUMNS[@]}")
+
+  {
+    if [[ -z "$NO_HEADER" ]]
+    then
+      # shellcheck disable=SC2031
+      for col in "${COLUMN_NAMES[@]}"
+      do
+        if [[ -n "$NO_COLOR" ]]
+        then
+          echo -ne "${col}\t"
+        else
+          echo -ne "\e[1m${col}\e[0m\t"
+        fi
+      done
+      echo
+    fi
+
+    jq -er --argjson cols_json "$columns_json_arr" '
+      def extractFields:
+        . as $obj |
+        reduce $cols_json[] as $field (
+          {}; . + {
+            ($field | gsub("\\."; "_")): $obj | getpath($field / ".")
+          }
+        );
+
+      "N/A" as $NA |
+
+      . |
+      if (. | type == "array")
+      then
+        sort_by((.["name"]? // .["network_id"]? // .["description"]?) | ascii_downcase) |
+        map(extractFields)[]
+      else
+        extractFields
+      end |
+      map(
+        if (
+            (. | type == "null") or
+            ((. | type == "string") and ((. | length) == 0))
+          )
+        then
+          .
+        elif (. | type == "array")
+        then
+          if (. | length) > 0
+          then
+            if all(.[]; type == "object" and has("name"))
+            then
+              ([.[].name] | sort | join(","))
+            else
+              (. | join(", "))
+            end
+          else
+            .
+          end
+        else
+          .
+        end
+      ) | @tsv
+    ' | colorizecolumns
+  } | column -t -s '	'
+}
+
 main() {
   local ARGS=()
 
@@ -1246,7 +1313,7 @@ main() {
     shift
   fi
 
-  COLUMNS=(name)
+  JSON_COLUMNS=(name)
   COLUMN_NAMES=(Name)
 
   case "$API_ITEM" in
@@ -1279,7 +1346,7 @@ main() {
       esac
       ;;
     g|gr*)
-      COLUMNS=(name peers)
+      JSON_COLUMNS=(name peers)
       COLUMN_NAMES=("Name" Peers)
       case "$ACTION" in
         list|get)
@@ -1294,7 +1361,7 @@ main() {
       esac
       ;;
     p|peer*)
-      COLUMNS=(hostname ip dns_label connected version groups)
+      JSON_COLUMNS=(hostname ip dns_label connected version groups)
       COLUMN_NAMES=(Hostname "Netbird IP" "DNS" Connected Version Groups)
       case "$ACTION" in
         list|get)
@@ -1310,7 +1377,7 @@ main() {
       esac
       ;;
     r|ro*)
-      COLUMNS=(network_id network masquerade metric groups peer_groups)
+      JSON_COLUMNS=(network_id network masquerade metric groups peer_groups)
       COLUMN_NAMES=("Net ID" "Network" "MASQ" "Metric" "Dist Groups" "Peer Groups")
       case "$ACTION" in
         list|get)
@@ -1325,7 +1392,7 @@ main() {
       esac
       ;;
     s|setup*)
-      COLUMNS=(name auto_groups state key)
+      JSON_COLUMNS=(name auto_groups state key)
       COLUMN_NAMES=("Name" Groups State Key)
       case "$ACTION" in
         list|get)
@@ -1343,7 +1410,7 @@ main() {
       esac
       ;;
     t|token*)
-      COLUMNS=(name created_at expiration_date last_used)
+      JSON_COLUMNS=(name created_at expiration_date last_used)
       COLUMN_NAMES=(Name "Created At" "Expires" "Last Used")
       case "$ACTION" in
         list|get)
@@ -1358,7 +1425,7 @@ main() {
       esac
       ;;
     u|user*)
-      COLUMNS=(name role auto_groups)
+      JSON_COLUMNS=(name role auto_groups)
       COLUMN_NAMES=(Name Role "Groups")
       case "$ACTION" in
         list|get)
@@ -1367,7 +1434,7 @@ main() {
       esac
       ;;
     w|whoami|self|me)
-      COLUMNS=(name role auto_groups)
+      JSON_COLUMNS=(name role auto_groups)
       COLUMN_NAMES=(Name Role "Groups")
       case "$ACTION" in
         list|get)
@@ -1401,7 +1468,7 @@ main() {
 
   if [[ -n "$WITH_ID_COL" ]]
   then
-    COLUMNS=(id "${COLUMNS[@]}")
+    JSON_COLUMNS=(id "${JSON_COLUMNS[@]}")
     COLUMN_NAMES=(ID "${COLUMN_NAMES[@]}")
   fi
 
@@ -1424,90 +1491,27 @@ main() {
       jq -e "${JQ_ARGS[@]}" <<< "$JSON_DATA"
       ;;
     pretty|field)
-      {
-        if [[ -z "$JSON_DATA" ]]
-        then
-          return 1
-        elif [[ "$JSON_DATA" == "{}" || "$JSON_DATA" == "[]" ]]
-        then
-          return 0
-        fi
+      if [[ -z "$JSON_DATA" ]]
+      then
+        return 1
+      elif [[ "$JSON_DATA" == "{}" || "$JSON_DATA" == "[]" ]]
+      then
+        return 0
+      fi
 
-        # Convert JSON_DATA to array if it contains only one object
-        if <<<"$JSON_DATA" jq -er '(. | type) == "object"' &>/dev/null
-        then
-          JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
-        fi
+      # Convert JSON_DATA to array if it contains only one object
+      if <<<"$JSON_DATA" jq -er '(. | type) == "object"' &>/dev/null
+      then
+        JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
+      fi
 
-        if [[ -n "$FIELD" ]]
-        then
-          <<<"$JSON_DATA" jq -er --arg field "$FIELD" '.[] | .[$field]'
-          return "$?"
-        fi
+      if [[ -n "$FIELD" ]]
+      then
+        <<<"$JSON_DATA" jq -er --arg field "$FIELD" '.[] | .[$field]'
+        return "$?"
+      fi
 
-        if [[ -z "$NO_HEADER" ]]
-        then
-          # shellcheck disable=SC2031
-          for col in "${COLUMN_NAMES[@]}"
-          do
-            if [[ -n "$NO_COLOR" ]]
-            then
-              echo -ne "${col}\t"
-            else
-              echo -ne "\e[1m${col}\e[0m\t"
-            fi
-          done
-          echo
-        fi
-        # shellcheck disable=SC2031
-        COLUMNS_JSON=$(arr_to_json "${COLUMNS[@]}")
-
-        <<<"$JSON_DATA" jq -er --argjson cols_json "$COLUMNS_JSON" '
-          def extractFields:
-            . as $obj |
-            reduce $cols_json[] as $field (
-              {}; . + {
-                ($field | gsub("\\."; "_")): $obj | getpath($field / ".")
-              }
-            );
-
-          "N/A" as $NA |
-
-          . |
-          if (. | type == "array")
-          then
-            sort_by((.["name"]? // .["network_id"]? // .["description"]?) | ascii_downcase) |
-            map(extractFields)[]
-          else
-            extractFields
-          end |
-          map(
-            if (
-                (. | type == "null") or
-                ((. | type == "string") and ((. | length) == 0))
-              )
-            then
-              $NA
-            elif (. | type == "array")
-            then
-              if (. | length) > 0
-              then
-                if all(.[]; type == "object" and has("name"))
-                then
-                  ([.[].name] | sort | join(","))
-                else
-                  (. | join(", "))
-                end
-              else
-                $NA
-              end
-            else
-              .
-            end
-          ) | @tsv
-        ' | \
-        colorizecolumns
-      } | column -t -s '	'
+      pretty_output <<< "$JSON_DATA"
       ;;
   esac
 }
