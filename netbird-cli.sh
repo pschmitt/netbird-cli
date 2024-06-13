@@ -8,6 +8,7 @@ RESOLVE="${RESOLVE:-}"
 OUTPUT="${OUTPUT:-pretty}"
 NO_COLOR="${NO_COLOR:-}"
 NO_HEADER="${NO_HEADER:-}"
+COMPACT="${COMPACT:-}"
 SORT_BY="${SORT_BY:-name}"
 WITH_ID_COL="${WITH_ID_COL:-}"
 JQ_ARGS=()
@@ -26,6 +27,7 @@ usage() {
   echo "  -j, --json           Output raw JSON (shorthand for -o json)"
   echo "  -N, --no-header      Do not show the header row"
   echo "  -c, --no-color       Do not colorize the output"
+  echo "  --compact            Compact output (truncate)"
   echo "  -s, --sort <col>     Sort by the specified column"
   echo "  -r, --resolve        Resolve group names for setup keys"
   echo
@@ -1189,7 +1191,13 @@ pretty_output() {
       echo
     fi
 
-    jq -er --arg sort_by "${SORT_BY:-name}" --argjson cols_json "$columns_json_arr" '
+    local compact=false
+    [[ -n "$COMPACT" ]] && compact=true
+
+    jq -er \
+      --arg sort_by "${SORT_BY:-name}" \
+      --argjson cols_json "$columns_json_arr" \
+      --argjson compact "$compact" '
       def extractFields:
         . as $obj |
         reduce $cols_json[] as $field (
@@ -1230,7 +1238,13 @@ pretty_output() {
           else
             if all(.[]; type == "object" and has("name"))
             then
-              ([.[].name] | sort | join(","))
+              [.[].name] | sort | join(",") as $out |
+              if ($compact and (($out | length) > 40))
+              then
+                $out[0:50] + "…"
+              else
+                $out
+              end
             else
               (. | join(", "))
             end
@@ -1297,6 +1311,10 @@ main() {
       -c|--no-color)
         NO_COLOR=1
         shift
+        ;;
+      --compact)
+        COMPACT=1
+        shift 1
         ;;
       -s|--sort*)
         SORT_BY="$2"
