@@ -229,6 +229,54 @@ nb_list_events() {
   nb_curl events
 }
 
+nb_prettify_events_json() {
+  local groups
+  groups=$(nb_list_groups)
+
+  if [[ -z "$groups" ]]
+  then
+    echo_error "Failed to list groups"
+    return 1
+  fi
+
+  jq -er --argjson group_data "$groups" '
+    map(. | . + {
+      meta_str: (
+
+        # Setup key added
+        if (.activity_code == "setupkey.group.add")
+        then
+          .meta.setupkey + " -> grp: " + .meta.group
+
+        # Peer registered using setup key
+        elif (.activity_code == "setupkey.peer.add")
+        then
+          .meta.name + " used key " + .meta.setup_key_name
+
+        # Route added/deleted/updated
+        elif (.activity_code | test("^route."))
+        then
+          # TODO Resolve group names
+          # NOTE The groups are not really JSON data
+          # eg: "peer_groups": "[cp30j3fopoau27orerrg]"
+          # -> note the missing quotes around the group ID
+          # (.meta.peer_groups | fromjson) as $peer_grps |
+          .meta.network_range + " via " + .meta.peer_groups
+
+        # Unknown activity, just try to extract the name property
+        else
+          if (.meta | has("name"))
+          then
+            .meta.name
+          else
+            ""
+          end
+        end
+      )
+    })
+  '
+}
+
 # https://docs.netbird.io/api/resources/groups#list-all-groups
 # shellcheck disable=SC2120
 nb_list_groups() {
@@ -1678,6 +1726,15 @@ main() {
         <<<"$JSON_DATA" jq -er --arg field "$FIELD" '.[] | .[$field]'
         return "$?"
       fi
+
+      # special post-processing
+      case "$COMMAND" in
+        nb_list_events)
+          JSON_COLUMNS+=(meta_str)
+          COLUMN_NAMES+=(Meta)
+          JSON_DATA=$(nb_prettify_events_json <<< "$JSON_DATA")
+          ;;
+      esac
 
       pretty_output <<< "$JSON_DATA"
       ;;
