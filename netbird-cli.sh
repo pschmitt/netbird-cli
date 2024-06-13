@@ -1476,6 +1476,10 @@ main() {
   case "$OUTPUT" in
     pretty)
       RESOLVE=1
+      if [[ ! -t 1 ]]
+      then
+        NO_COLOR=1
+      fi
       ;;
     field)
       if [[ -z "$FIELD" ]]
@@ -1529,7 +1533,7 @@ main() {
     json)
       jq -e "${JQ_ARGS[@]}" <<< "$JSON_DATA"
       ;;
-    pretty|field)
+    *)
       if [[ -n "$FIELD" ]]
       then
         <<<"$JSON_DATA" jq -er --arg field "$FIELD" '.[] | .[$field]'
