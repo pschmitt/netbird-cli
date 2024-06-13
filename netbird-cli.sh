@@ -1496,6 +1496,20 @@ main() {
 
   JSON_DATA="$("$COMMAND" "$@")"
 
+  if [[ -z "$JSON_DATA" ]]
+  then
+    return 1
+  elif [[ "$JSON_DATA" == "{}" || "$JSON_DATA" == "[]" ]]
+  then
+    return 0
+  fi
+
+  # Convert JSON_DATA to array if it contains only one object
+  if <<<"$JSON_DATA" jq -er '(. | type) == "object"' &>/dev/null
+  then
+    JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
+  fi
+
   if [[ -n "$RESOLVE" ]]
   then
     JSON_DATA="$(nb_resolve_groups <<< "$JSON_DATA")"
@@ -1506,20 +1520,6 @@ main() {
       jq -e "${JQ_ARGS[@]}" <<< "$JSON_DATA"
       ;;
     pretty|field)
-      if [[ -z "$JSON_DATA" ]]
-      then
-        return 1
-      elif [[ "$JSON_DATA" == "{}" || "$JSON_DATA" == "[]" ]]
-      then
-        return 0
-      fi
-
-      # Convert JSON_DATA to array if it contains only one object
-      if <<<"$JSON_DATA" jq -er '(. | type) == "object"' &>/dev/null
-      then
-        JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
-      fi
-
       if [[ -n "$FIELD" ]]
       then
         <<<"$JSON_DATA" jq -er --arg field "$FIELD" '.[] | .[$field]'
