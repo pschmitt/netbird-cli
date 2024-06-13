@@ -33,36 +33,36 @@ usage() {
   echo "  -r, --resolve        Resolve group names for setup keys"
   echo
   echo "Items and Actions:"
-  echo "  accounts    list            List accounts"
+  echo "  accounts    list                        List accounts"
   echo
-  echo "  country     list [COUNTRY]  List countries or get cities for a specific country"
+  echo "  country     list [COUNTRY]              List countries or get cities for a specific country"
   echo
-  echo "  dns         list [ID/NAME]  List nameservers groups or get a specific ns by ID or name"
+  echo "  dns         list [ID/NAME]              List nameservers groups or get a specific ns by ID or name"
   echo
-  echo "  events      list            List events"
+  echo "  events      list                        List events"
   echo
-  echo "  groups      list [ID/NAME]          List groups or get a specific group by ID or name"
-  echo "              create NAME [PEER1...]  Create a group with optional peers"
-  echo "              delete ID/NAME          Delete a group by ID or name"
+  echo "  groups      list [ID/NAME]              List groups or get a specific group by ID or name"
+  echo "              create NAME [PEER1...]      Create a group with optional peers"
+  echo "              delete ID/NAME              Delete a group by ID or name"
   echo
-  echo "  peers       list [ID/NAME]          List peers or get a specific peer by ID or name"
+  echo "  peers       list [ID/NAME]              List peers or get a specific peer by ID or name"
   echo
-  echo "  posture     list [ID/NAME]          List posture checks or get a specific check by ID or name"
+  echo "  posture     list [ID/NAME]              List posture checks or get a specific check by ID or name"
   echo
-  echo "  routes      list [ID/NAME]          List routes or get a specific route by ID or name"
-  echo "              delete ID/NAME          Delete a route by ID or name"
+  echo "  routes      list [ID/NAME]              List routes or get a specific route by ID or name"
+  echo "              delete ID/NAME              Delete a route by ID or name"
   echo
-  echo "  setup-keys  list [ID/NAME]          List setup keys or get a specific key by ID or name"
-  echo "              create NAME [OPTIONS]   Create a setup key with the given name and options"
-  echo "              update NAME [OPTIONS]   Update an existing setup key"
-  echo "              revoke ID/NAME          Revoke a setup key by ID or name"
+  echo "  setup-keys  list [ID/NAME]              List setup keys or get a specific key by ID or name"
+  echo "              create NAME [OPTIONS]       Create a setup key with the given name and options"
+  echo "              update NAME [OPTIONS]       Update an existing setup key"
+  echo "              revoke ID/NAME              Revoke a setup key by ID or name"
   echo
   echo "  tokens      list USER                   List tokens for a specific user"
   echo "              create USER NAME [OPTIONS]  Create a token for a user with the given name and options"
   echo "              delete USER TOKEN           Delete a token for a user by token name or ID"
   echo
-  echo "  users       list [ID/NAME]  List users or get a specific user by ID or name"
-  echo "  whoami      Get the current user"
+  echo "  users       list [ID/NAME]              List users or get a specific user by ID or name"
+  echo "  whoami                                  Get the current user"
 }
 
 usage_create_group() {
