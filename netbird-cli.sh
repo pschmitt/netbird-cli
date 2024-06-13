@@ -673,7 +673,7 @@ nb_list_setup_keys() {
         endpoint+="/${setup_key_id}"
         single=1
       else
-        echo_error "Multiple setup-keys found with name '$1'"
+        echo_warning "Multiple setup-keys found with name '$1'"
 
         local setup_key
         for setup_key in $setup_key_id
