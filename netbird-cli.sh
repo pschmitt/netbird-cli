@@ -267,7 +267,11 @@ nb_resolve_groups() {
         if has($attr)
         then
           .[$attr] = (
-            if (.[ $attr ] | type) == "array"
+          if (
+              (.[ $attr ] | type) == "array"
+              and
+              all(.[ $attr ]; type == "object")
+            )
             then
               # Map group IDs to objects or keep original if not found
               .[$attr] | map(gmap[.] // .)
