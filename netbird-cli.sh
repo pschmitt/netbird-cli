@@ -1350,6 +1350,7 @@ main() {
         ;;
       --)
         shift
+        ARGS+=("$@")
         break
         ;;
       *)
