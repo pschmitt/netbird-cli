@@ -22,8 +22,9 @@ usage() {
   echo "  --no-warnings        Suppress warning messages"
   echo "  -u, --url <url>      Set the NetBird API URL"
   echo "  -t, --token <token>  Set the NetBird API token"
-  echo "  -J, --jq-args <args> Add arguments to jq"
-  echo "  -o, --output <mode>  Set the output mode (json, pretty)"
+  echo "  -J, --jq-args <args> Add arguments to jq (json output only)"
+  echo "  -o, --output <mode>  Set the output mode (json, pretty, plain or field)"
+  echo "  -F, --fields <cols>  Set the output fields"
   echo "  -j, --json           Output raw JSON (shorthand for -o json)"
   echo "  -N, --no-header      Do not show the header row"
   echo "  -c, --no-color       Do not colorize the output"
@@ -1511,8 +1512,10 @@ main() {
   case "$OUTPUT" in
     pretty)
       RESOLVE=1
+      # Skip header and color if output is not a terminal
       if [[ ! -t 1 ]]
       then
+        NO_HEADER=1
         NO_COLOR=1
       fi
       ;;
