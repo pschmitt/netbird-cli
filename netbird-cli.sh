@@ -1313,7 +1313,7 @@ main() {
         NO_COLOR=1
         shift
         ;;
-      --compact)
+      --compact|--truncate)
         COMPACT=1
         shift 1
         ;;
