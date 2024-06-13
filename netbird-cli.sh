@@ -1348,6 +1348,10 @@ main() {
         RESOLVE=1
         shift
         ;;
+      --)
+        shift
+        break
+        ;;
       *)
         ARGS+=("$1")
         shift
