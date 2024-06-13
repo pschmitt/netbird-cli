@@ -274,7 +274,7 @@ nb_resolve_groups() {
           if (
               (.[ $attr ] | type) == "array"
               and
-              all(.[ $attr ]; type == "object")
+              all(.[ $attr ][]; type == "string")
             )
             then
               # Map group IDs to objects or keep original if not found
