@@ -8,6 +8,7 @@ RESOLVE="${RESOLVE:-}"
 OUTPUT="${OUTPUT:-pretty}"
 NO_COLOR="${NO_COLOR:-}"
 NO_HEADER="${NO_HEADER:-}"
+SORT_BY="${SORT_BY:-name}"
 WITH_ID_COL="${WITH_ID_COL:-}"
 JQ_ARGS=()
 
@@ -25,6 +26,7 @@ usage() {
   echo "  -j, --json           Output raw JSON (shorthand for -o json)"
   echo "  -N, --no-header      Do not show the header row"
   echo "  -c, --no-color       Do not colorize the output"
+  echo "  -s, --sort <col>     Sort by the specified column"
   echo "  -r, --resolve        Resolve group names for setup keys"
   echo
   echo "Items and Actions:"
@@ -1296,6 +1298,11 @@ main() {
         NO_COLOR=1
         shift
         ;;
+      -s|--sort*)
+        SORT_BY="$2"
+        CUSTOM_SORT=1
+        shift 2
+        ;;
       -r|--resolve)
         RESOLVE=1
         shift
@@ -1335,7 +1342,6 @@ main() {
 
   JSON_COLUMNS=(name)
   COLUMN_NAMES=(Name)
-  SORT_BY=name
 
   case "$API_ITEM" in
     a|acc*)
@@ -1360,7 +1366,7 @@ main() {
       esac
       ;;
     e|event*)
-      SORT_BY=timestamp
+      [[ -z "$CUSTOM_SORT" ]] && SORT_BY=timestamp
       case "$ACTION" in
         list|get)
           JSON_COLUMNS=(activity initiator_name timestamp)
@@ -1403,7 +1409,7 @@ main() {
     r|ro*)
       JSON_COLUMNS=(network_id network masquerade metric groups peer_groups)
       COLUMN_NAMES=("Net ID" "Network" "MASQ" "Metric" "Dist Groups" "Peer Groups")
-      SORT_BY=network_id
+      [[ -z "$CUSTOM_SORT" ]] && SORT_BY=network_id
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_routes
