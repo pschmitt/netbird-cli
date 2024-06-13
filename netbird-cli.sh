@@ -255,25 +255,30 @@ nb_resolve_groups() {
     return 1
   fi
 
-  jq -er --argjson groups "$groups" '
-    def expand_groups(key):
-      .[key] = (
-        .[key] | map(
-          . as $id | ($groups[] | select(.id == $id) | .)
-          // { name: "**Unknown Group**", id: $id }
+  jq -er --argjson group_data "$groups" '
+    # Create a lookup map from group_data
+    def groups_map:
+      ($group_data | map({key: .id, value: .}) | from_entries);
+
+    # Expand group IDs to full group objects for the specified attributes
+    def expand_group_ids(gmap; attrs):
+      reduce attrs[] as $attr (
+        .;
+        .[$attr] = (
+          if (.[ $attr ] | type) == "array"
+          then
+            # Map group IDs to objects or keep original if not found
+            .[$attr] | map(gmap[.] // .)
+          else
+            # If not an array, keep the original value
+            .[$attr]
+          end
         )
       );
 
+    # Expand group attrs
     map(
-      . as $item |
-      reduce ["auto_groups", "groups", "peer_groups"][] as $key (
-        $item;
-        if ($item | has($key)) and ($item[$key] | type == "string") then
-          $item | expand_groups($key)
-        else
-          .
-        end
-      )
+      expand_group_ids(groups_map; ["auto_groups", "groups", "peer_groups"])
     )
   '
 }
@@ -1407,14 +1412,12 @@ main() {
     return 2
   fi
 
-  JSON_DATA="$("$COMMAND" "$@" | {
-    if [[ -n "$RESOLVE" ]]
-    then
-      nb_resolve_groups
-    else
-      cat
-    fi
-  })"
+  JSON_DATA="$("$COMMAND" "$@")"
+
+  if [[ -n "$RESOLVE" ]]
+  then
+    JSON_DATA="$(nb_resolve_groups <<< "$JSON_DATA")"
+  fi
 
   case "$OUTPUT" in
     json)
