@@ -78,6 +78,11 @@ usage_create_setup_key() {
   echo "Options:"
   echo "  -h, --help            Show this help message and exit"
   echo "  -g, --auto-groups     Add the setup key to the specified groups"
+  echo "  -E, --expires            Expiration time in seconds"
+  echo "  -e, --ephemeral          Ephemeral setup key"
+  echo "  -l, --usage-limit        Usage limit"
+  echo "  -r, --revoked true|false Revoke the setup key"
+  echo "  -t, --type               Setup key type (reusable or one-off)"
 }
 
 usage_create_route() {
@@ -1591,6 +1596,11 @@ main() {
           COMMAND=nb_create_setup_key
           ;;
         update)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_setup_key | sed 's#create#update#g'
+            return 0
+          fi
           COMMAND=nb_update_setup_key
           ;;
         del|delete|rm|remove)
