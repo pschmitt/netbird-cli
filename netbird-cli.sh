@@ -16,6 +16,8 @@ usage() {
   echo
   echo "Options:"
   echo "  -h, --help           Show this help message and exit"
+  echo "  --debug              Enable debug output"
+  echo "  --no-warnings        Suppress warning messages"
   echo "  -u, --url <url>      Set the NetBird API URL"
   echo "  -t, --token <token>  Set the NetBird API token"
   echo "  -J, --jq-args <args> Add arguments to jq"
@@ -90,7 +92,7 @@ echo_success() {
 }
 
 echo_warning() {
-  [[ -n "$NO_WARNING" ]] && return 0
+  [[ -n "$NO_WARNINGS" ]] && return 0
   echo -e "\e[1m\e[33mWRN\e[0m $*" >&2
 }
 
@@ -1251,6 +1253,10 @@ main() {
         ;;
       --debug)
         DEBUG=1
+        shift
+        ;;
+      --no-warnings)
+        NO_WARNINGS=1
         shift
         ;;
       -u|--url)
