@@ -20,11 +20,11 @@ usage() {
   echo "  -h, --help           Show this help message and exit"
   echo "  --debug              Enable debug output"
   echo "  --no-warnings        Suppress warning messages"
-  echo "  -u, --url <url>      Set the NetBird API URL"
-  echo "  -t, --token <token>  Set the NetBird API token"
+  echo "  -u, --url <url>      Set the NetBird API URL (NB_MANAGEMENT_URL)"
+  echo "  -t, --token <token>  Set the NetBird API token (NB_API_TOKEN)"
   echo "  -J, --jq-args <args> Add arguments to jq (json output only)"
   echo "  -o, --output <mode>  Set the output mode (json, pretty, plain or field)"
-  echo "  -F, --fields <cols>  Set the output fields"
+  echo "  -F, --field <col>    Set the (single!) output field"
   echo "  -j, --json           Output raw JSON (shorthand for -o json)"
   echo "  -N, --no-header      Do not show the header row"
   echo "  -c, --no-color       Do not colorize the output"
@@ -76,28 +76,28 @@ usage_create_setup_key() {
   echo "Usage: $(basename "$0") setup-key create NAME [OPTIONS]"
   echo
   echo "Options:"
-  echo "  -h, --help                Show this help message and exit"
-  echo "  -g, --auto-groups         Add the setup key to the specified groups"
-  echo "  -E, --expires             Expiration time in seconds"
-  echo "  -e, --ephemeral           Ephemeral setup key"
-  echo "  -l, --usage-limit         Usage limit"
-  echo "  -r, --revoked true|false  Revoke the setup key"
-  echo "  -t, --type                Setup key type (reusable or one-off)"
+  echo "  -h, --help               Show this help message and exit"
+  echo "  -g, --auto-groups <grp>  Auto-add peers to this group (can be specified multiple times)"
+  echo "  -E, --expires <time>     Expiration time in seconds (default: 31536000, ie. 1y)"
+  echo "  -e, --ephemeral <bool>   Ephemeral setup key (default: false)"
+  echo "  -l, --usage-limit <int>  Usage limit count (default: 0, ie. infinite)"
+  echo "  -r, --revoked <bool>     Whether to revoke the key (default: false)"
+  echo "  -t, --type <type>        Setup key type (reusable or one-off)"
 }
 
 usage_create_route() {
   echo "Usage: $(basename "$0") route create OPTIONS"
   echo
   echo "Options:"
-  echo "  -h, --help            Show this help message and exit"
-  echo "  -d, --description     Description of the route"
-  echo "  -i, --network-id      Network ID"
-  echo "  -e, --enabled         Enable the route"
-  echo "  -m, --metric          Metric"
-  echo "  -M, --masquerade      Enable masquerade"
-  echo "  -n, --network         Network CIDR"
-  echo "  -g, --routing-group   Routing peer group(s)"
-  echo "  -D, --dist-group      Distribution group(s)"
+  echo "  -h, --help                 Show this help message and exit"
+  echo "  -d, --description <str>    Description of the route"
+  echo "  -i, --network-id <str>     Network ID (name, max 40 chars)"
+  echo "  -e, --enabled <bool>       Enable the route (default: true)"
+  echo "  -m, --metric <int>         Route metric (default: 9999)"
+  echo "  -M, --masquerade <bool>    Enable masquerading (default: true)"
+  echo "  -n, --network <cidr>       Network CIDR"
+  echo "  -g, --routing-group <grp>  Routing peer group(s), can be specified multiple times"
+  echo "  -D, --dist-group <grp>     Distribution group(s), can be specified multiple times"
 }
 
 usage_create_token() {
@@ -105,7 +105,7 @@ usage_create_token() {
   echo
   echo "Options:"
   echo "  -h, --help            Show this help message and exit"
-  echo "  -E, --expires         Expiration time in seconds"
+  echo "  -E, --expires <int>   Expiration time in days (default: 365)"
 }
 
 echo_info() {
