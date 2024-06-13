@@ -65,8 +65,15 @@ usage() {
   echo "  whoami      Get the current user"
 }
 
+usage_create_group() {
+  echo "Usage: $(basename "$0") group create NAME [PEER1 PEER2 ...]"
+  echo
+  echo "Options:"
+  echo "  -h, --help  Show this help message and exit"
+}
+
 usage_create_setup_key() {
-  echo "Usage: $(basename "$0") setup-keys create NAME [OPTIONS]"
+  echo "Usage: $(basename "$0") setup-key create NAME [OPTIONS]"
   echo
   echo "Options:"
   echo "  -h, --help            Show this help message and exit"
@@ -74,7 +81,7 @@ usage_create_setup_key() {
 }
 
 usage_create_route() {
-  echo "Usage: $(basename "$0") routes create OPTIONS"
+  echo "Usage: $(basename "$0") route create OPTIONS"
   echo
   echo "Options:"
   echo "  -h, --help            Show this help message and exit"
@@ -86,6 +93,14 @@ usage_create_route() {
   echo "  -n, --network         Network CIDR"
   echo "  -g, --routing-group   Routing peer group(s)"
   echo "  -D, --dist-group      Distribution group(s)"
+}
+
+usage_create_token() {
+  echo "Usage: $(basename "$0") token create USER NAME [OPTIONS]"
+  echo
+  echo "Options:"
+  echo "  -h, --help            Show this help message and exit"
+  echo "  -E, --expires         Expiration time in seconds"
 }
 
 echo_info() {
@@ -1260,13 +1275,14 @@ pretty_output() {
 
 main() {
   local ARGS=()
+  local ACTION=list
 
   while [[ -n "$*" ]]
   do
     case "$1" in
       -h|--help)
-        usage
-        exit 0
+        ACTION=help
+        shift
         ;;
       --debug)
         DEBUG=1
@@ -1349,12 +1365,17 @@ main() {
     exit 2
   fi
 
-  API_ITEM="$1"
+  local API_ITEM="$1"
   shift
 
-  ACTION=list
+  local HELP_ACTION
   if [[ -n "$1" ]] && ! is_nb_id "$1"
   then
+    if [[ "$ACTION" == "help" ]]
+    then
+      HELP_ACTION=1
+    fi
+
     ACTION="$1"
     shift
   fi
@@ -1367,6 +1388,10 @@ main() {
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_accounts
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
@@ -1382,9 +1407,14 @@ main() {
         # FIXME This does result in öäü etc being sorted after 'z'
         [[ -z "$CUSTOM_SORT" ]] && SORT_BY=city_name
       fi
+
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_countries
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
@@ -1392,6 +1422,10 @@ main() {
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_dns
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
@@ -1403,6 +1437,10 @@ main() {
           COLUMN_NAMES=(Activity Initiator Time)
           COMMAND=nb_list_events
           ;;
+        help)
+          usage
+          return 0
+          ;;
       esac
       ;;
     g|gr*)
@@ -1413,10 +1451,19 @@ main() {
           COMMAND=nb_list_groups
           ;;
         create)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_group
+            return 0
+          fi
           COMMAND=nb_create_group
           ;;
         del|delete|rm|remove)
           COMMAND=nb_delete_group
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
@@ -1427,12 +1474,20 @@ main() {
         list|get)
           COMMAND=nb_list_peers
           ;;
+        help)
+          usage
+          return 0
+          ;;
       esac
       ;;
     postu*)
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_posture_checks
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
@@ -1445,10 +1500,19 @@ main() {
           COMMAND=nb_list_routes
           ;;
         create)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_route
+            return 0
+          fi
           COMMAND=nb_create_route
           ;;
         del|delete|rm|remove)
           COMMAND=nb_delete_route
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
@@ -1460,6 +1524,11 @@ main() {
           COMMAND=nb_list_setup_keys
           ;;
         create)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_setup_key
+            return 0
+          fi
           COMMAND=nb_create_setup_key
           ;;
         update)
@@ -1467,6 +1536,10 @@ main() {
           ;;
         del|delete|rm|remove)
           COMMAND=nb_revoke_setup_key
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
@@ -1478,10 +1551,19 @@ main() {
           COMMAND=nb_list_tokens
           ;;
         create)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_token
+            return 0
+          fi
           COMMAND=nb_create_token
           ;;
         del|delete|rm|remove)
           COMMAND=nb_delete_token
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
@@ -1492,6 +1574,10 @@ main() {
         list|get)
           COMMAND=nb_list_users
           ;;
+        help)
+          usage
+          return 0
+          ;;
       esac
       ;;
     w|whoami|self|me)
@@ -1500,6 +1586,10 @@ main() {
       case "$ACTION" in
         list|get)
           COMMAND=nb_whoami
+          ;;
+        help)
+          usage
+          return 0
           ;;
       esac
       ;;
