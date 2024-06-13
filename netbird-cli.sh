@@ -57,7 +57,7 @@ usage() {
   echo "              update NAME [OPTIONS]       Update an existing setup key"
   echo "              revoke ID/NAME              Revoke a setup key by ID or name"
   echo
-  echo "  tokens      list USER                   List tokens for a specific user"
+  echo "  tokens      list [USER]                 List tokens for a specific user (default: current user)"
   echo "              create USER NAME [OPTIONS]  Create a token for a user with the given name and options"
   echo "              delete USER TOKEN           Delete a token for a user by token name or ID"
   echo
@@ -1055,7 +1055,7 @@ nb_revoke_setup_key() {
 nb_list_tokens() {
   local user="$1"
 
-  if [[ -z "$user" ]]
+  if [[ -z "$user" || "$user" == "self" ]]
   then
     user=$(nb_user_id self)
   elif ! is_nb_id "$user"
@@ -1099,7 +1099,7 @@ nb_list_tokens() {
 nb_token_id() {
   local user="$1"
 
-  if [[ -z "$user" ]]
+  if [[ -z "$user" || "$user" == "self" ]]
   then
     user=$(nb_user_id self)
   elif ! is_nb_id "$user"
@@ -1126,7 +1126,7 @@ nb_token_id() {
 nb_create_token() {
   local user="$1"
 
-  if [[ -z "$user" ]]
+  if [[ -z "$user" || "$user" == "self" ]]
   then
     user=$(nb_user_id self)
   elif ! is_nb_id "$user"
@@ -1161,7 +1161,7 @@ nb_delete_token() {
   local user="$1"
   local token="$2"
 
-  if [[ -z "$user" ]]
+  if [[ -z "$user" || "$user" == "self" ]]
   then
     user=$(nb_user_id self)
   elif ! is_nb_id "$user"
