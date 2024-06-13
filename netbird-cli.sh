@@ -264,16 +264,21 @@ nb_resolve_groups() {
     def expand_group_ids(gmap; attrs):
       reduce attrs[] as $attr (
         .;
-        .[$attr] = (
-          if (.[ $attr ] | type) == "array"
-          then
-            # Map group IDs to objects or keep original if not found
-            .[$attr] | map(gmap[.] // .)
-          else
-            # If not an array, keep the original value
-            .[$attr]
-          end
-        )
+        if has($attr)
+        then
+          .[$attr] = (
+            if (.[ $attr ] | type) == "array"
+            then
+              # Map group IDs to objects or keep original if not found
+              .[$attr] | map(gmap[.] // .)
+            else
+              # If not an array, keep the original value
+              .[$attr]
+            end
+          )
+        else
+          .
+        end
       );
 
     # Expand group attrs
@@ -445,7 +450,6 @@ nb_posture_check_id() {
 # shellcheck disable=SC2120
 nb_list_routes() {
   local endpoint="routes"
-  local single
 
   if [[ -n "$1" ]]
   then
@@ -462,7 +466,6 @@ nb_list_routes() {
         return 1
       fi
 
-      single=1
       endpoint+="/${route_id}"
     fi
   fi
@@ -1178,7 +1181,7 @@ pretty_output() {
       echo
     fi
 
-    jq -er --argjson cols_json "$columns_json_arr" '
+    jq -er --arg sort_by "${SORT_BY:-name}" --argjson cols_json "$columns_json_arr" '
       def extractFields:
         . as $obj |
         reduce $cols_json[] as $field (
@@ -1192,7 +1195,14 @@ pretty_output() {
       . |
       if (. | type == "array")
       then
-        sort_by((.["name"]? // .["network_id"]? // .["description"]?) | ascii_downcase) |
+        sort_by(
+          if (.[ $sort_by ] | type) == "string"
+          then
+            (.[ $sort_by ] | ascii_downcase)
+          else
+            .[ $sort_by ]
+          end
+        ) |
         map(extractFields)[]
       else
         extractFields
@@ -1315,6 +1325,7 @@ main() {
 
   JSON_COLUMNS=(name)
   COLUMN_NAMES=(Name)
+  SORT_BY=name
 
   case "$API_ITEM" in
     a|acc*)
@@ -1339,8 +1350,11 @@ main() {
       esac
       ;;
     e|event*)
+      SORT_BY=timestamp
       case "$ACTION" in
         list|get)
+          JSON_COLUMNS=(activity initiator_name timestamp)
+          COLUMN_NAMES=(Activity Initiator Time)
           COMMAND=nb_list_events
           ;;
       esac
@@ -1379,6 +1393,7 @@ main() {
     r|ro*)
       JSON_COLUMNS=(network_id network masquerade metric groups peer_groups)
       COLUMN_NAMES=("Net ID" "Network" "MASQ" "Metric" "Dist Groups" "Peer Groups")
+      SORT_BY=network_id
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_routes
