@@ -317,6 +317,12 @@ nb_resolve_groups() {
 # https://docs.netbird.io/api/resources/groups#create-a-group
 # Usage: nb_create_group NAME [PEER1 PEER2 ...]
 nb_create_group() {
+  if [[ -z "$1" ]]
+  then
+    usage_create_group >&2
+    return 2
+  fi
+
   local name="$1"
   shift
 
