@@ -1203,19 +1203,19 @@ pretty_output() {
             ((. | type == "string") and ((. | length) == 0))
           )
         then
-          .
+          $NA
         elif (. | type == "array")
         then
-          if (. | length) > 0
+          if (. | length) == 0
           then
+            $NA
+          else
             if all(.[]; type == "object" and has("name"))
             then
               ([.[].name] | sort | join(","))
             else
               (. | join(", "))
             end
-          else
-            .
           end
         else
           .
