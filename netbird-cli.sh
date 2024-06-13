@@ -1198,6 +1198,11 @@ main() {
         OUTPUT=json
         shift
         ;;
+      -F|--field)
+        OUTPUT=field
+        FIELD="$2"
+        shift 2
+        ;;
       -I|--id*)
         WITH_ID_COL=1
         shift
@@ -1386,6 +1391,13 @@ main() {
     pretty)
       RESOLVE=1
       ;;
+    field)
+      if [[ -z "$FIELD" ]]
+      then
+        echo "Output set to field but no field name provided" >&2
+        return 2
+      fi
+      ;;
     plain)
       RESOLVE=1
       NO_COLOR=1
@@ -1413,7 +1425,7 @@ main() {
       json)
         jq -e "${JQ_ARGS[@]}"
         ;;
-      pretty)
+      pretty|field)
         {
           JSON_DATA=$(cat)
           if [[ -z "$JSON_DATA" ]]
@@ -1425,9 +1437,15 @@ main() {
           fi
 
           # Convert JSON_DATA to array if it contains only one object
-          if <<<"$data" jq -er '(. | type) == "object"' &>/dev/null
+          if <<<"$JSON_DATA" jq -er '(. | type) == "object"' &>/dev/null
           then
             JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
+          fi
+
+          if [[ -n "$FIELD" ]]
+          then
+            <<<"$JSON_DATA" jq -er --arg field "$FIELD" '.[] | .[$field]'
+            return "$?"
           fi
 
           if [[ -z "$NO_HEADER" ]]
