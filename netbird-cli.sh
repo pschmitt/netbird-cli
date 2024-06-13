@@ -2,8 +2,12 @@
 
 NB_API_TOKEN="${NB_API_TOKEN:-}"
 NB_MANAGEMENT_URL="${NB_MANAGEMENT_URL:-https://api.netbird.cloud}"
+
 RESOLVE="${RESOLVE:-}"
 OUTPUT="${OUTPUT:-pretty}"
+NO_COLOR="${NO_COLOR:-}"
+NO_HEADER="${NO_HEADER:-}"
+WITH_ID_COL="${WITH_ID_COL:-}"
 JQ_ARGS=()
 
 usage() {
@@ -208,6 +212,41 @@ nb_group_id() {
   '
 }
 
+# Resolve group IDs in JSON data
+# usage: nb_resolve_groups <<< "$JSON_DATA"
+nb_resolve_groups() {
+  local groups
+  groups=$(nb_list_groups)
+
+  if [[ -z "$groups" ]]
+  then
+    echo "Failed to list groups" >&2
+    return 1
+  fi
+
+  jq -er --argjson groups "$groups" '
+    def expand_groups(key):
+      .[key] = (
+        .[key] | map(
+          . as $id | ($groups[] | select(.id == $id) | .)
+          // { name: "**Unknown Group**", id: $id }
+        )
+      );
+
+    map(
+      . as $item |
+      reduce ["auto_groups", "groups", "peer_groups"][] as $key (
+        $item;
+        if ($item | has($key)) and ($item[$key] | type == "string") then
+          $item | expand_groups($key)
+        else
+          .
+        end
+      )
+    )
+  '
+}
+
 # https://docs.netbird.io/api/resources/groups#create-a-group
 # Usage: nb_create_group NAME [PEER1 PEER2 ...]
 nb_create_group() {
@@ -399,40 +438,7 @@ nb_list_routes() {
     return 1
   fi
 
-  if [[ -z "$RESOLVE" ]]
-  then
-    printf '%s\n' "$data"
-    return 0
-  fi
-
-  local groups
-  groups=$(nb_list_groups)
-  if [[ -z "$groups" ]]
-  then
-    echo "Failed to list groups" >&2
-    return 1
-  fi
-
-  <<<"$data" jq -er ${single:+-s} --argjson groups "$groups" '
-    map(
-      . + {
-        groups: (
-          .groups // [] | map((
-            . as $id | $groups[] | select(.id == $id) |
-            { name: .name, id: $id }
-            // { name: "**Unknown Group**", id: $id }
-          ))
-        ),
-        peer_groups: (
-          .peer_groups // [] | map((
-            . as $id | $groups[] | select(.id == $id) |
-            { name: .name, id: $id }
-            // { name: "**Unknown Group**", id: $id }
-          ))
-        )
-      }
-    )
-  '
+  printf '%s\n' "$data"
 }
 
 nb_route_id() {
@@ -658,33 +664,7 @@ nb_list_setup_keys() {
     fi
   fi
 
-  if [[ -z "$RESOLVE" ]]
-  then
-    printf '%s\n' "$data"
-    return 0
-  fi
-
-  local groups
-  groups=$(nb_list_groups)
-  if [[ -z "$groups" ]]
-  then
-    echo "Failed to list groups" >&2
-    return 1
-  fi
-
-  <<<"$data" jq -er ${single:+-s} --argjson groups "$groups" '
-    map(
-      . + {
-        auto_groups: (
-          .auto_groups // [] | map((
-            . as $id | $groups[] | select(.id == $id) |
-            { name: .name, id: $id }
-            // { name: "**Unknown Group**", id: $id }
-          ))
-        )
-      }
-    )
-  '
+  printf '%s\n' "$data"
 }
 
 # https://docs.netbird.io/api/resources/setup-keys#list-all-setup-keys
@@ -1120,33 +1100,7 @@ nb_list_users() {
     return 1
   fi
 
-  if [[ -z "$RESOLVE" ]]
-  then
-    printf '%s\n' "$data"
-    return 0
-  fi
-
-  local groups
-  groups=$(nb_list_groups)
-  if [[ -z "$groups" ]]
-  then
-    echo "Failed to list groups" >&2
-    return 1
-  fi
-
-  <<<"$data" jq -er --argjson groups "$groups" '
-    map(
-      . + {
-        auto_groups: (
-          .auto_groups // [] | map((
-            . as $id | $groups[] | select(.id == $id) |
-            { name: .name, id: $id }
-            // { name: "**Unknown Group**", id: $id }
-          ))
-        )
-      }
-    )
-  '
+  printf '%s\n' "$data"
 }
 
 nb_whoami() {
@@ -1418,102 +1372,106 @@ main() {
     return 2
   fi
 
-  set -o pipefail
+  JSON_DATA="$("$COMMAND" "$@" | {
+    if [[ -n "$RESOLVE" ]]
+    then
+      nb_resolve_groups
+    else
+      cat
+    fi
+  })"
 
-  "$COMMAND" "$@" | {
-    case "$OUTPUT" in
-      json)
-        jq -e "${JQ_ARGS[@]}"
-        ;;
-      pretty|field)
-        {
-          JSON_DATA=$(cat)
-          if [[ -z "$JSON_DATA" ]]
-          then
-            return 1
-          elif [[ "$JSON_DATA" == "{}" || "$JSON_DATA" == "[]" ]]
-          then
-            return 0
-          fi
+  case "$OUTPUT" in
+    json)
+      jq -e "${JQ_ARGS[@]}" <<< "$JSON_DATA"
+      ;;
+    pretty|field)
+      {
+        if [[ -z "$JSON_DATA" ]]
+        then
+          return 1
+        elif [[ "$JSON_DATA" == "{}" || "$JSON_DATA" == "[]" ]]
+        then
+          return 0
+        fi
 
-          # Convert JSON_DATA to array if it contains only one object
-          if <<<"$JSON_DATA" jq -er '(. | type) == "object"' &>/dev/null
-          then
-            JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
-          fi
+        # Convert JSON_DATA to array if it contains only one object
+        if <<<"$JSON_DATA" jq -er '(. | type) == "object"' &>/dev/null
+        then
+          JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
+        fi
 
-          if [[ -n "$FIELD" ]]
-          then
-            <<<"$JSON_DATA" jq -er --arg field "$FIELD" '.[] | .[$field]'
-            return "$?"
-          fi
+        if [[ -n "$FIELD" ]]
+        then
+          <<<"$JSON_DATA" jq -er --arg field "$FIELD" '.[] | .[$field]'
+          return "$?"
+        fi
 
-          if [[ -z "$NO_HEADER" ]]
-          then
-            # shellcheck disable=SC2031
-            for col in "${COLUMN_NAMES[@]}"
-            do
-              if [[ -n "$NO_COLOR" ]]
-              then
-                echo -ne "${col}\t"
-              else
-                echo -ne "\e[1m${col}\e[0m\t"
-              fi
-            done
-            echo
-          fi
+        if [[ -z "$NO_HEADER" ]]
+        then
           # shellcheck disable=SC2031
-          COLUMNS_JSON=$(arr_to_json "${COLUMNS[@]}")
-
-          <<<"$JSON_DATA" jq -er --argjson cols_json "$COLUMNS_JSON" '
-            def extractFields:
-              . as $obj |
-              reduce $cols_json[] as $field (
-                {}; . + {
-                  ($field | gsub("\\."; "_")): $obj | getpath($field / ".")
-                }
-              );
-
-            "N/A" as $NA |
-
-            . |
-            if (. | type == "array")
+          for col in "${COLUMN_NAMES[@]}"
+          do
+            if [[ -n "$NO_COLOR" ]]
             then
-              sort_by((.["name"]? // .["network_id"]? // .["description"]?) | ascii_downcase) |
-              map(extractFields)[]
+              echo -ne "${col}\t"
             else
-              extractFields
-            end |
-            map(
-              if (
-                  (. | type == "null") or
-                  ((. | type == "string") and ((. | length) == 0))
-                )
+              echo -ne "\e[1m${col}\e[0m\t"
+            fi
+          done
+          echo
+        fi
+        # shellcheck disable=SC2031
+        COLUMNS_JSON=$(arr_to_json "${COLUMNS[@]}")
+
+        <<<"$JSON_DATA" jq -er --argjson cols_json "$COLUMNS_JSON" '
+          def extractFields:
+            . as $obj |
+            reduce $cols_json[] as $field (
+              {}; . + {
+                ($field | gsub("\\."; "_")): $obj | getpath($field / ".")
+              }
+            );
+
+          "N/A" as $NA |
+
+          . |
+          if (. | type == "array")
+          then
+            sort_by((.["name"]? // .["network_id"]? // .["description"]?) | ascii_downcase) |
+            map(extractFields)[]
+          else
+            extractFields
+          end |
+          map(
+            if (
+                (. | type == "null") or
+                ((. | type == "string") and ((. | length) == 0))
+              )
+            then
+              $NA
+            elif (. | type == "array")
+            then
+              if (. | length) > 0
               then
-                $NA
-              elif (. | type == "array")
-              then
-                if (. | length) > 0
+                if all(.[]; type == "object" and has("name"))
                 then
-                  if all(.[]; type == "object" and has("name"))
-                  then
-                    ([.[].name] | sort | join(","))
-                  else
-                    (. | join(", "))
-                  end
+                  ([.[].name] | sort | join(","))
                 else
-                  $NA
+                  (. | join(", "))
                 end
               else
-                .
+                $NA
               end
-            ) | @tsv
-          ' | \
-          colorizecolumns
-        } | column -t -s '	'
-        ;;
-    esac
-  }
+            else
+              .
+            end
+          ) | @tsv
+        ' | \
+        colorizecolumns
+      } | column -t -s '	'
+      ;;
+  esac
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]
