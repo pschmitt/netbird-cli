@@ -1269,8 +1269,16 @@ pretty_output() {
     local compact=false
     [[ -n "$COMPACT" ]] && compact=true
 
+    local sort_by=${SORT_BY:-name} sort_reverse=false
+    if [[ "$sort_by" == -* ]]
+    then
+      sort_by="${sort_by:1}"
+      sort_reverse=true
+    fi
+
     jq -er \
-      --arg sort_by "${SORT_BY:-name}" \
+      --arg sort_by "$sort_by" \
+      --argjson sort_reverse "$sort_reverse" \
       --argjson cols_json "$columns_json_arr" \
       --argjson compact "$compact" '
       def extractFields:
@@ -1287,14 +1295,13 @@ pretty_output() {
       if (. | type == "array")
       then
         sort_by(
-          if (.[ $sort_by ] | type) == "string"
+          if ((.[ $sort_by ] | type) == "string")
           then
             (.[ $sort_by ] | ascii_downcase)
           else
             .[ $sort_by ]
           end
-        ) |
-        map(extractFields)[]
+        ) | (if $sort_reverse then reverse else . end) | map(extractFields)[]
       else
         extractFields
       end |
@@ -1313,10 +1320,11 @@ pretty_output() {
           else
             if all(.[]; type == "object" and has("name"))
             then
-              [.[].name] | sort | join(",") as $out |
-              if ($compact and (($out | length) > 40))
+              40 as $maxwidth |
+              [.[].name] | sort | join(" ") as $out |
+              if ($compact and (($out | length) > $maxwidth))
               then
-                $out[0:50] + "…"
+                $out[0:$maxwidth] + "…"
               else
                 $out
               end
