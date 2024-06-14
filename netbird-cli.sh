@@ -29,6 +29,7 @@ usage() {
   echo "  -N, --no-header      Do not show the header row"
   echo "  -c, --no-color       Do not colorize the output"
   echo "  --compact            Compact output (truncate)"
+  echo "  --columns <cols>     Set the columns to display (comma-separated)"
   echo "  -s, --sort <col>     Sort by the specified column"
   echo "  -r, --resolve        Resolve group names for setup keys"
   echo
@@ -1344,6 +1345,10 @@ main() {
   local ARGS=()
   local ACTION=list
 
+  # Globals!
+  JSON_COLUMNS=(name)
+  COLUMN_NAMES=(Name)
+
   while [[ -n "$*" ]]
   do
     case "$1" in
@@ -1400,6 +1405,19 @@ main() {
         COMPACT=1
         shift 1
         ;;
+      --columns)
+        local CUSTOM_COLUMNS=1
+        mapfile -t JSON_COLUMNS < <(tr ',' '\n' <<< "$2")
+
+        COLUMN_NAMES=() # Reset
+        local col col_capitalized
+        for col in "${JSON_COLUMNS[@]}"
+        do
+          col_capitalized="$(tr '[:lower:]' '[:upper:]' <<< "${col:0:1}")${col:1}"
+          COLUMN_NAMES+=("$col_capitalized")
+        done
+        shift 2
+        ;;
       -s|--sort*)
         SORT_BY="$2"
         CUSTOM_SORT=1
@@ -1452,9 +1470,6 @@ main() {
     shift
   fi
 
-  JSON_COLUMNS=(name)
-  COLUMN_NAMES=(Name)
-
   case "$API_ITEM" in
     a|acc*)
       case "$ACTION" in
@@ -1470,12 +1485,20 @@ main() {
     country*|geo*)
       if [[ -z "$*" ]]
       then
-        JSON_COLUMNS=(country_code country_name)
-        COLUMN_NAMES=(Code Name)
+        if [[ -z "$CUSTOM_COLUMNS" ]]
+        then
+          JSON_COLUMNS=(country_code country_name)
+          COLUMN_NAMES=(Code Name)
+        fi
+
         [[ -z "$CUSTOM_SORT" ]] && SORT_BY=country_name
       else
-        JSON_COLUMNS=(city_name geoname_id)
-        COLUMN_NAMES=(City "Geo ID")
+        if [[ -z "$CUSTOM_COLUMNS" ]]
+        then
+          JSON_COLUMNS=(city_name geoname_id)
+          COLUMN_NAMES=(City "Geo ID")
+        fi
+
         # FIXME This does result in öäü etc being sorted after 'z'
         [[ -z "$CUSTOM_SORT" ]] && SORT_BY=city_name
       fi
@@ -1502,11 +1525,16 @@ main() {
       esac
       ;;
     e|event*)
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(activity initiator_name timestamp)
+        COLUMN_NAMES=(Activity Initiator Time)
+      fi
+
       [[ -z "$CUSTOM_SORT" ]] && SORT_BY=timestamp
+
       case "$ACTION" in
         list|get)
-          JSON_COLUMNS=(activity initiator_name timestamp)
-          COLUMN_NAMES=(Activity Initiator Time)
           COMMAND=nb_list_events
           ;;
         help)
@@ -1516,8 +1544,12 @@ main() {
       esac
       ;;
     g|gr*)
-      JSON_COLUMNS=(name peers_count peers)
-      COLUMN_NAMES=("Name" "Peer count" Peers)
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(name peers_count peers)
+        COLUMN_NAMES=("Name" "Peer count" Peers)
+      fi
+
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_groups
@@ -1540,8 +1572,12 @@ main() {
       esac
       ;;
     p|peer*)
-      JSON_COLUMNS=(hostname ip dns_label connected version groups)
-      COLUMN_NAMES=(Hostname "Netbird IP" "DNS" Connected Version Groups)
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(hostname ip dns_label connected version groups)
+        COLUMN_NAMES=(Hostname "Netbird IP" "DNS" Connected Version Groups)
+      fi
+
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_peers
@@ -1564,9 +1600,14 @@ main() {
       esac
       ;;
     r|ro*)
-      JSON_COLUMNS=(network_id network masquerade metric groups peer_groups)
-      COLUMN_NAMES=("Net ID" "Network" "MASQ" "Metric" "Dist Groups" "Peer Groups")
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(network_id network masquerade metric groups peer_groups)
+        COLUMN_NAMES=("Net ID" "Network" "MASQ" "Metric" "Dist Groups" "Peer Groups")
+      fi
+
       [[ -z "$CUSTOM_SORT" ]] && SORT_BY=network_id
+
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_routes
@@ -1589,8 +1630,12 @@ main() {
       esac
       ;;
     s|setup*)
-      JSON_COLUMNS=(name auto_groups state key)
-      COLUMN_NAMES=("Name" Groups State Key)
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(name auto_groups state key)
+        COLUMN_NAMES=("Name" Groups State Key)
+      fi
+
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_setup_keys
@@ -1621,8 +1666,12 @@ main() {
       esac
       ;;
     t|token*)
-      JSON_COLUMNS=(name created_at expiration_date last_used)
-      COLUMN_NAMES=(Name "Created At" "Expires" "Last Used")
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(name created_at expiration_date last_used)
+        COLUMN_NAMES=(Name "Created At" "Expires" "Last Used")
+      fi
+
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_tokens
@@ -1645,8 +1694,12 @@ main() {
       esac
       ;;
     u|user*)
-      JSON_COLUMNS=(name role auto_groups)
-      COLUMN_NAMES=(Name Role "Groups")
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(name role auto_groups)
+        COLUMN_NAMES=(Name Role "Groups")
+      fi
+
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_users
@@ -1658,8 +1711,12 @@ main() {
       esac
       ;;
     w|whoami|self|me)
-      JSON_COLUMNS=(name role auto_groups)
-      COLUMN_NAMES=(Name Role "Groups")
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(name role auto_groups)
+        COLUMN_NAMES=(Name Role "Groups")
+      fi
+
       case "$ACTION" in
         list|get)
           COMMAND=nb_whoami
@@ -1748,8 +1805,11 @@ main() {
       # special post-processing
       case "$COMMAND" in
         nb_list_events)
-          JSON_COLUMNS+=(meta_str)
-          COLUMN_NAMES+=(Meta)
+          if [[ -z "$CUSTOM_COLUMNS" ]]
+          then
+            JSON_COLUMNS+=(meta_str)
+            COLUMN_NAMES+=(Meta)
+          fi
           JSON_DATA=$(nb_prettify_events_json <<< "$JSON_DATA")
           ;;
       esac
