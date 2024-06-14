@@ -139,6 +139,17 @@ arr_to_json() {
   printf '%s\n' "$@" | jq -Rn '[inputs]'
 }
 
+to_bool() {
+  case "$1" in
+    true|t|1|yes|on|y)
+      echo true
+      ;;
+    *)
+      echo false
+      ;;
+  esac
+}
+
 # shellcheck disable=SC2120
 colorizecolumns() {
   if [[ -n "$NO_COLOR" ]]
@@ -602,14 +613,7 @@ nb_create_route() {
         shift 2
         ;;
       -e|--enabled)
-        case "$2" in
-          true|t|1)
-            enabled=true
-            ;;
-          *)
-            enabled=false
-            ;;
-        esac
+        enabled=$(to_bool "$2")
         shift 2
         ;;
       -m|--metric)
@@ -617,14 +621,7 @@ nb_create_route() {
         shift 2
         ;;
       -M|--masq*)
-        case "$2" in
-          true|t|1)
-            masq=true
-            ;;
-          *)
-            masq=false
-            ;;
-        esac
+        masq=$(to_bool "$2")
         shift 2
         ;;
       -n|--network|--cidr)
@@ -826,14 +823,7 @@ nb_create_setup_key() {
         return 0
         ;;
       -e|--ephemeral)
-        case "$2" in
-          true|t|1)
-            ephemeral=true
-            ;;
-          *)
-            ephemeral=false
-            ;;
-        esac
+        ephemeral=$(to_bool "$2")
         shift 2
         ;;
       -E|--expir*)
@@ -849,14 +839,7 @@ nb_create_setup_key() {
         shift 2
         ;;
       -r|--revoked)
-        case "$2" in
-          true|t|1)
-            revoked=true
-            ;;
-          *)
-            revoked=false
-            ;;
-        esac
+        revoked=$(to_bool "$2")
         shift 2
         ;;
       -t|--type)
@@ -929,14 +912,7 @@ nb_update_setup_key() {
         return 0
         ;;
       -e|--ephemeral)
-        case "$2" in
-          true|t|1)
-            ephemeral=true
-            ;;
-          *)
-            ephemeral=false
-            ;;
-        esac
+        ephemeral=$(to_bool "$2")
         shift 2
         ;;
       -E|--expir*)
@@ -952,14 +928,7 @@ nb_update_setup_key() {
         shift 2
         ;;
       -r|--revoked)
-        case "$2" in
-          true|t|1)
-            revoked=true
-            ;;
-          *)
-            revoked=false
-            ;;
-        esac
+        revoked=$(to_bool "$2")
         shift 2
         ;;
       -t|--type)
