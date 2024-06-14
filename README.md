@@ -4,9 +4,10 @@ Bash wrapper for the [Netbird API](https://docs.netbird.io/api/introduction).
 
 ## Requirements
 
-- gnuawk
 - bash
+- column
 - curl
+- gnuawk
 - jq
 
 ## Usage
