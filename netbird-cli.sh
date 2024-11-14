@@ -58,6 +58,7 @@ usage() {
   echo "              update NAME [OPTIONS]       Update an existing setup key"
   echo "              revoke ID/NAME              Revoke a setup key by ID or name"
   echo "              renew ID/NAME               Renew a setup key by ID or name"
+  echo "              delete ID/NAME              Delete a setup key by ID or name"
   echo
   echo "  tokens      list [USER]                 List tokens for a specific user (default: current user)"
   echo "              create USER NAME [OPTIONS]  Create a token for a user with the given name and options"
@@ -1056,6 +1057,38 @@ nb_revoke_setup_key() {
   nb_curl "setup-keys/${setup_key}" -X PUT --data-raw "$data"
 }
 
+# https://docs.netbird.io/api/resources/setup-keys#delete-a-setup-key
+nb_delete_setup_key() {
+  local setup_key="$1"
+
+  if [[ -z "$setup_key" ]]
+  then
+    echo "Missing setup_key ID/name"
+    return 2
+  fi
+
+  if ! is_nb_id "$setup_key"
+  then
+    setup_key_id=$(nb_setup_key_id "$setup_key")
+
+    if [[ -z "$setup_key_id" ]]
+    then
+      echo_error "Failed to determine setup key ID of '$setup_key'"
+      return 1
+    fi
+
+    setup_key="$setup_key_id"
+  fi
+
+  if [[ -z "$data" ]]
+  then
+    echo_error "Failed to retrieve setup key data of '$setup_key'"
+    return 1
+  fi
+
+  nb_curl "setup-keys/${setup_key}" -X DELETE
+}
+
 # https://docs.netbird.io/api/resources/tokens#list-all-tokens
 nb_list_tokens() {
   local user="$1"
@@ -1660,8 +1693,11 @@ main() {
           fi
           COMMAND=nb_update_setup_key
           ;;
-        del|delete|rm|remove)
+        rev|revoke)
           COMMAND=nb_revoke_setup_key
+          ;;
+        del|delete)
+          COMMAND=nb_delete_setup_key
           ;;
         renew)
           COMMAND=nb_renew_setup_key
