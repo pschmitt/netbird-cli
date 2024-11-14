@@ -223,6 +223,12 @@ nb_curl() {
 is_nb_id() {
   local thing="$1"
 
+  # setup-key ids are just numbers. eg: 12345678
+  if [[ "$thing" =~ ^[0-9]+$ ]]
+  then
+    return 0
+  fi
+
   if [[ "$thing" =~ ^[0-9a-z]{20}$ && "$thing" =~ .*[0-9]+.* ]]
   then
     return 0
