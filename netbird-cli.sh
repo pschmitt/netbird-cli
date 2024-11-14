@@ -1080,12 +1080,6 @@ nb_delete_setup_key() {
     setup_key="$setup_key_id"
   fi
 
-  if [[ -z "$data" ]]
-  then
-    echo_error "Failed to retrieve setup key data of '$setup_key'"
-    return 1
-  fi
-
   nb_curl "setup-keys/${setup_key}" -X DELETE
 }
 
