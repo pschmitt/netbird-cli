@@ -57,6 +57,7 @@ usage() {
   echo "              create NAME [OPTIONS]       Create a setup key with the given name and options"
   echo "              update NAME [OPTIONS]       Update an existing setup key"
   echo "              revoke ID/NAME              Revoke a setup key by ID or name"
+  echo "              renew ID/NAME               Renew a setup key by ID or name"
   echo
   echo "  tokens      list [USER]                 List tokens for a specific user (default: current user)"
   echo "              create USER NAME [OPTIONS]  Create a token for a user with the given name and options"
@@ -209,7 +210,7 @@ nb_curl() {
   shift
   local url="${NB_MANAGEMENT_URL}/api/${endpoint}"
 
-  curl -fsSL \
+  curl -fsSL --retry 5 --retry-all-errors \
     -H "Authorization: Token $NB_API_TOKEN" \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
@@ -960,11 +961,14 @@ nb_update_setup_key() {
   then
     # Resolve groups
     local -a resolved_groups
-    local g
+    local g gid
 
     for g in "${auto_groups[@]}"
     do
-      resolved_groups+=("$(nb_group_id "$g")")
+      gid=$(nb_group_id "$g")
+      # fallback to the original value (probably a group ID)
+      [[ -z "$gid" ]] && gid="$g"
+      resolved_groups+=("$gid")
     done
 
     auto_groups_json=$(arr_to_json "${resolved_groups[@]}")
@@ -991,6 +995,37 @@ nb_update_setup_key() {
     ')
 
   nb_curl "setup-keys/${setup_key_id}" -X PUT --data-raw "$data"
+}
+
+nb_renew_setup_key() {
+  local name="$1"
+
+  local data
+  data=$(nb_list_setup_keys "$name")
+  if [[ -z "$data" || "$data" == "null" ]]
+  then
+    echo_error "Failed to retrieve setup key data of '$name'"
+    return 1
+  fi
+
+  echo_debug "Setup key data: $data"
+
+  local groups
+  mapfile -t groups < <(jq -er '.auto_groups[]' <<< "$data")
+  local group_args=()
+  local g
+  for g in "${groups[@]}"
+  do
+    group_args+=("--group" "$g")
+  done
+
+  nb_update_setup_key "$name" \
+    --revoked false \
+    --ephemeral "$(jq -er '.ephemeral' <<< "$data")" \
+    --expires "$(jq -er '.expires_in' <<< "$data")" \
+    --type "$(jq -er '.type' <<< "$data")" \
+    --usage-limit "$(jq -er '.usage_limit' <<< "$data")" \
+    "${group_args[@]}"
 }
 
 nb_revoke_setup_key() {
@@ -1627,6 +1662,9 @@ main() {
           ;;
         del|delete|rm|remove)
           COMMAND=nb_revoke_setup_key
+          ;;
+        renew)
+          COMMAND=nb_renew_setup_key
           ;;
         help)
           usage
