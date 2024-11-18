@@ -874,6 +874,7 @@ nb_create_setup_key() {
 
   local name="$1"
   shift
+  echo_info "Creating setup key $name"
 
   local auto_groups_json=null
   if [[ "${#auto_groups[@]}" -gt 0 ]]
@@ -924,15 +925,11 @@ nb_update_setup_key() {
   fi
 
   echo_info "Deleting setup key $setup_key_id"
-  if nb_delete_setup_key "$setup_key_id" >/dev/null
+  if ! nb_delete_setup_key "$setup_key_id" >/dev/null
   then
-    echo_success "Deleted setup key $setup_key_id"
-  else
-    echo_error "Failed to delete setup key $setup_key_id"
     return 1
   fi
 
-  echo_info "Creating setup key $setup_key"
   nb_create_setup_key "$setup_key" "$@"
 }
 
@@ -1024,7 +1021,14 @@ nb_delete_setup_key() {
     setup_key="$setup_key_id"
   fi
 
-  nb_curl "setup-keys/${setup_key}" -X DELETE
+  if nb_curl "setup-keys/${setup_key}" -X DELETE
+  then
+    echo_success "Deleted setup key $setup_key"
+    return 0
+  fi
+
+  echo_error "Failed to delete setup key $setup_key"
+  return 1
 }
 
 # https://docs.netbird.io/api/resources/tokens#list-all-tokens
