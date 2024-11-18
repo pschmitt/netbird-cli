@@ -761,7 +761,8 @@ nb_list_setup_keys() {
 
       if [[ $(wc -l <<< "$setup_key_id") -eq 1 ]]
       then
-        endpoint+="/${setup_key_id}"
+        # FIXME This always yields 404 on 0.32.0
+        # endpoint+="/${setup_key_id}"
         single=1
       else
         echo_warning "Multiple setup-keys found with name '$1'"
@@ -788,7 +789,9 @@ nb_list_setup_keys() {
   then
     if [[ -n "$single" ]]
     then
-      data=$(<<<"$data" jq -er 'select(.revoked == false)')
+      # FIXME This was altered due to 0.32.0 always returning a 404 for individual keys
+      # data=$(<<<"$data" jq -er 'select(.revoked == false)')
+      data=$(<<<"$data" jq -er --arg key_id "$setup_key_id" '.[] | select(.id == $key_id and .revoked == false)')
     else
       data=$(<<<"$data" jq -er '[.[] | select(.revoked == false)]')
     fi
@@ -808,7 +811,7 @@ nb_setup_key_id() {
 
   local setup_key_name="$1"
 
-  nb_list_setup_keys | jq -er --arg setup_key_name "$setup_key_name" '
+  nb_list_setup_keys --all | jq -er --arg setup_key_name "$setup_key_name" '
     .[] | select(.name == $setup_key_name) | .id
   '
 }
@@ -904,104 +907,27 @@ nb_create_setup_key() {
 
 # https://docs.netbird.io/api/resources/setup-keys#update-a-setup-key
 nb_update_setup_key() {
-  local args
-  local -a auto_groups
-  local ephemeral="${ephemeral:-true}"
-  local expires_in="${expires_in:-null}" # never
-  local revoked="${revoked:-false}"
-  local type="${type:-reusable}" # or: one-off
-  local usage_limit=0 # unlimited
-
-  while [[ -n "$*" ]]
-  do
-    case "$1" in
-      -h|--help|-\?)
-        usage_create_setup_key
-        return 0
-        ;;
-      -e|--ephemeral)
-        ephemeral=$(to_bool "$2")
-        shift 2
-        ;;
-      -E|--expir*)
-        expires_in="$2"
-        shift 2
-        ;;
-      -g|--auto-groups|--group*)
-        auto_groups+=("$2")
-        shift 2
-        ;;
-      -l|--usage-limit)
-        usage_limit="$2"
-        shift 2
-        ;;
-      -r|--revoked)
-        revoked=$(to_bool "$2")
-        shift 2
-        ;;
-      -t|--type)
-        type="$2"
-        shift 2
-        ;;
-      *)
-        args+=("$1")
-        shift
-        ;;
-    esac
-  done
-
-  set -- "${args[@]}"
-
-  local name="$1"
+  local setup_key="$1"
   shift
-
   local setup_key_id
-  setup_key_id=$(nb_setup_key_id "$name")
+  setup_key_id=$(nb_setup_key_id "$setup_key")
   if [[ -z "$setup_key_id" ]]
   then
-    echo_error "Failed to determine setup key ID of '$name'"
+    echo_error "Failed to determine setup key ID of '$setup_key'"
     return 1
   fi
 
-  local auto_groups_json=null
-  if [[ "${#auto_groups[@]}" -gt 0 ]]
+  echo_info "Deleting setup key $setup_key_id"
+  if nb_delete_setup_key "$setup_key_id" >/dev/null
   then
-    # Resolve groups
-    local -a resolved_groups
-    local g gid
-
-    for g in "${auto_groups[@]}"
-    do
-      gid=$(nb_group_id "$g")
-      # fallback to the original value (probably a group ID)
-      [[ -z "$gid" ]] && gid="$g"
-      resolved_groups+=("$gid")
-    done
-
-    auto_groups_json=$(arr_to_json "${resolved_groups[@]}")
+    echo_success "Deleted setup key $setup_key_id"
+  else
+    echo_error "Failed to delete setup key $setup_key_id"
+    return 1
   fi
 
-  local data
-  data=$(jq -Rcsn \
-    --arg name "$name" \
-    --arg type "$type" \
-    --argjson expires_in "$expires_in" \
-    --argjson revoked "$revoked" \
-    --argjson auto_groups "$auto_groups_json" \
-    --argjson usage_limit "$usage_limit" \
-    --argjson ephemeral "$ephemeral" '
-      {
-        name: $name,
-        type: $type,
-        expires_in: $expires_in,
-        revoked: $revoked,
-        auto_groups: $auto_groups,
-        usage_limit: $usage_limit,
-        ephemeral: $ephemeral
-      }
-    ')
-
-  nb_curl "setup-keys/${setup_key_id}" -X PUT --data-raw "$data"
+  echo_info "Creating setup key $setup_key"
+  nb_create_setup_key "$setup_key" "$@"
 }
 
 nb_renew_setup_key() {
@@ -1059,6 +985,12 @@ nb_revoke_setup_key() {
 
   local data
   data=$(nb_list_setup_keys "$setup_key" | jq -er '.revoked = true')
+
+  if [[ -z "$data" || "$data" == "null" ]]
+  then
+    echo_error "Failed to retrieve setup key data of '$setup_key'"
+    return 1
+  fi
 
   nb_curl "setup-keys/${setup_key}" -X PUT --data-raw "$data"
 }
