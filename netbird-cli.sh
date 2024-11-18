@@ -81,7 +81,7 @@ usage_create_setup_key() {
   echo "Options:"
   echo "  -h, --help               Show this help message and exit"
   echo "  -g, --auto-groups <grp>  Auto-add peers to this group (can be specified multiple times)"
-  echo "  -E, --expires <time>     Expiration time in seconds (default: 31536000, ie. 1y)"
+  echo "  -E, --expires <time>     Expiration time in seconds (default: never)"
   echo "  -e, --ephemeral <bool>   Ephemeral setup key (default: false)"
   echo "  -l, --usage-limit <int>  Usage limit count (default: 0, ie. infinite)"
   echo "  -r, --revoked <bool>     Whether to revoke the key (default: false)"
@@ -818,7 +818,7 @@ nb_create_setup_key() {
   local args
   local -a auto_groups
   local ephemeral="${ephemeral:-true}"
-  local expires_in="${expires_in:-31536000}" # 1 year
+  local expires_in="${expires_in:-null}" # never
   local revoked="${revoked:-false}"
   local type="${type:-reusable}" # or: one-off
   local usage_limit=0 # unlimited
@@ -907,7 +907,7 @@ nb_update_setup_key() {
   local args
   local -a auto_groups
   local ephemeral="${ephemeral:-true}"
-  local expires_in="${expires_in:-31536000}" # 1 year
+  local expires_in="${expires_in:-null}" # never
   local revoked="${revoked:-false}"
   local type="${type:-reusable}" # or: one-off
   local usage_limit=0 # unlimited
