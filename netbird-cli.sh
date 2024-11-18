@@ -1740,7 +1740,7 @@ main() {
 
   if [[ -z "$COMMAND" ]]
   then
-    echo "No command provided" >&2
+    echo_error "No command provided"
     usage >&2
     return 2
   fi
