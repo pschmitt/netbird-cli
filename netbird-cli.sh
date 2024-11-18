@@ -331,10 +331,16 @@ nb_list_groups() {
 
 # Get the group ID, given the group name
 nb_group_id() {
-  local group_name="$1"
+  local group="$1"
 
-  nb_list_groups | jq -er --arg group_name "$group_name" '
-    .[] | select(.name == $group_name) | .id
+  if is_nb_id "$group"
+  then
+    echo "$group"
+    return 0
+  fi
+
+  nb_list_groups | jq -er --arg group "$group" '
+    .[] | select(.name == $group) | .id
   '
 }
 
