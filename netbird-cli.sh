@@ -588,7 +588,24 @@ nb_list_routes() {
     return 1
   fi
 
-  printf '%s\n' "$data"
+  if [[ -n "$NO_HACKS" ]]
+  then
+    printf '%s\n' "$data"
+    exit 0
+  fi
+
+  # FIX for netbird's API return a static .network set to 192.168.2.0/32 for
+  # DNS routes
+  printf '%s\n' "$data" | \
+    jq -er '
+      .[] | .network = (
+        if .domains != null
+        then
+          (.domains | join(", "))
+        else
+          .network
+        end
+      )'
 }
 
 nb_route_id() {
