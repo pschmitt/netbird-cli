@@ -601,7 +601,7 @@ nb_list_routes() {
       .[] | .network = (
         if .domains != null
         then
-          (.domains | join(", "))
+          .domains
         else
           .network
         end
