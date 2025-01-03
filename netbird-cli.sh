@@ -630,6 +630,25 @@ nb_list_network_resources() {
 
   endpoint+="/resources"
 
+  if [[ -n "$2" ]]
+  then
+    if is_nb_id "$2"
+    then
+      endpoint+="/${2}"
+    else
+      local res_id
+      res_id=$(nb_network_resource_id "$1" "$2")
+
+      if [[ -z "$res_id" ]]
+      then
+        echo_error "Failed to determine network resource ID of '$2'"
+        return 1
+      fi
+
+      endpoint+="/${res_id}"
+    fi
+  fi
+
   local data
   if ! data=$(nb_curl "$endpoint")
   then
@@ -669,6 +688,25 @@ nb_list_network_routers() {
   fi
 
   endpoint+="/routers"
+
+  if [[ -n "$2" ]]
+  then
+    if is_nb_id "$2"
+    then
+      endpoint+="/${2}"
+    else
+      local res_id
+      res_id=$(nb_network_router_id "$1" "$2")
+
+      if [[ -z "$res_id" ]]
+      then
+        echo_error "Failed to determine network router ID of '$2'"
+        return 1
+      fi
+
+      endpoint+="/${res_id}"
+    fi
+  fi
 
   local data
   if ! data=$(nb_curl "$endpoint")
@@ -743,6 +781,22 @@ nb_network_id() {
   local net="$1"
   nb_list_networks | jq -er --arg net "$net" '
     .[] | select(.id == $net or .name == $net) | .id
+  '
+}
+
+nb_network_resource_id() {
+  local network="$1"
+  local res="$2"
+  nb_list_network_resources "$network" | jq -er --arg res "$res" '
+    .[] | select(.id == $res or .name == $res) | .id
+  '
+}
+
+nb_network_router_id() {
+  local network="$1"
+  local router="$2"
+  nb_list_network_routers "$network" | jq -er --arg router "$router" '
+    .[] | select(.id == $router or .name == $router) | .id
   '
 }
 
