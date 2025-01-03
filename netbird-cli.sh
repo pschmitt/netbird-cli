@@ -51,6 +51,7 @@ usage() {
   echo "  posture     list [ID/NAME]              List posture checks or get a specific check by ID or name"
   echo
   echo "  routes      list [ID/NAME]              List routes or get a specific route by ID or name"
+  echo "              create ARGS                 Create a route (see --help for args)"
   echo "              delete ID/NAME              Delete a route by ID or name"
   echo
   echo "  setup-keys  list [ID/NAME]              List setup keys or get a specific key by ID or name"
