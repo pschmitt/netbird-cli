@@ -46,6 +46,14 @@ usage() {
   echo "              create NAME [PEER1...]      Create a group with optional peers"
   echo "              delete ID/NAME              Delete a group by ID or name"
   echo
+  echo "  networks    list [ID/NAME]              List networks or get a specific network by ID or name"
+  echo "              create ARGS                 Create a network (see --help for args)"
+  echo "              delete ID/NAME              Delete a network by ID or name"
+  echo
+  echo "  resources   list [ID/NAME]              List network resourcess or get a specific network resource by ID or name"
+  echo "              create ARGS                 Create a network resources (see --help for args)"
+  echo "              delete ID/NAME              Delete a network resources by ID or name"
+  echo
   echo "  peers       list [ID/NAME]              List peers or get a specific peer by ID or name"
   echo
   echo "  posture     list [ID/NAME]              List posture checks or get a specific check by ID or name"
@@ -558,6 +566,121 @@ nb_posture_check_id() {
   '
 }
 
+# https://docs.netbird.io/api/resources/networks#list-all-networks
+# shellcheck disable=SC2120
+nb_list_networks() {
+  local endpoint="networks"
+
+  if [[ -n "$1" ]]
+  then
+    if is_nb_id "$1"
+    then
+      endpoint+="/${1}"
+    else
+      local network_id
+      network_id=$(nb_network_id "$1")
+
+      if [[ -z "$network_id" ]]
+      then
+        echo_error "Failed to determine network ID of '$1'"
+        return 1
+      fi
+
+      endpoint+="/${network_id}"
+    fi
+  fi
+
+  local data
+  if ! data=$(nb_curl "$endpoint")
+  then
+    echo_error "Failed to list networks"
+    return 1
+  fi
+
+  printf '%s\n' "$data"
+  return 0
+}
+
+# https://docs.netbird.io/api/resources/networks#list-all-network-resources
+# shellcheck disable=SC2120
+nb_list_network_resources() {
+  local endpoint="networks"
+
+  if [[ -z "$1" ]]
+  then
+    echo_error "Missing network ID/name"
+    return 2
+  fi
+
+  if is_nb_id "$1"
+  then
+    endpoint+="/${1}"
+  else
+    local network_id
+    network_id=$(nb_network_id "$1")
+
+    if [[ -z "$network_id" ]]
+    then
+      echo_error "Failed to determine network ID of '$1'"
+      return 1
+    fi
+
+    endpoint+="/${network_id}"
+  fi
+
+  endpoint+="/resources"
+
+  local data
+  if ! data=$(nb_curl "$endpoint")
+  then
+    echo_error "Failed to list network resources"
+    return 1
+  fi
+
+  printf '%s\n' "$data"
+  return 0
+}
+
+# https://docs.netbird.io/api/resources/networks#list-all-network-routers
+# shellcheck disable=SC2120
+nb_list_network_routers() {
+  local endpoint="networks"
+
+  if [[ -z "$1" ]]
+  then
+    echo_error "Missing network ID/name"
+    return 2
+  fi
+
+  if is_nb_id "$1"
+  then
+    endpoint+="/${1}"
+  else
+    local network_id
+    network_id=$(nb_network_id "$1")
+
+    if [[ -z "$network_id" ]]
+    then
+      echo_error "Failed to determine network ID of '$1'"
+      return 1
+    fi
+
+    endpoint+="/${network_id}"
+  fi
+
+  endpoint+="/routers"
+
+  local data
+  if ! data=$(nb_curl "$endpoint")
+  then
+    echo_error "Failed to list network routers"
+    return 1
+  fi
+
+  printf '%s\n' "$data"
+  return 0
+}
+
 # https://docs.netbird.io/api/resources/routes#list-all-routes
 # shellcheck disable=SC2120
 nb_list_routes() {
@@ -592,7 +715,7 @@ nb_list_routes() {
   if [[ -n "$NO_HACKS" ]]
   then
     printf '%s\n' "$data"
-    exit 0
+    return 0
   fi
 
   # FIX for netbird's API return a static .network set to 192.168.2.0/32 for
@@ -613,6 +736,13 @@ nb_route_id() {
   local network_id="$1"
   nb_list_routes | jq -er --arg network_id "$network_id" '
     .[] | select(.network_id == $network_id) | .id
+  '
+}
+
+nb_network_id() {
+  local net="$1"
+  nb_list_networks | jq -er --arg net "$net" '
+    .[] | select(.id == $net or .name == $net) | .id
   '
 }
 
@@ -1568,6 +1698,36 @@ main() {
           ;;
       esac
       ;;
+    n|net*)
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(id name description resources routers routing_peers_count)
+        COLUMN_NAMES=("Network ID" "Name" "Description" "Resources" "Routers" "Routing Peers")
+      fi
+
+      [[ -z "$CUSTOM_SORT" ]] && SORT_BY=name
+
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_networks
+          ;;
+        create)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_network
+            return 0
+          fi
+          COMMAND=nb_create_network
+          ;;
+        del|delete|rm|remove)
+          COMMAND=nb_delete_network
+          ;;
+        help)
+          usage
+          return 0
+          ;;
+      esac
+      ;;
     p|peer*)
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
@@ -1596,7 +1756,37 @@ main() {
           ;;
       esac
       ;;
-    r|ro*)
+    res*)
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(id name type groups description address)
+        COLUMN_NAMES=("ID" "Name" "Type" "Groups" "Description" "Address")
+      fi
+
+      [[ -z "$CUSTOM_SORT" ]] && SORT_BY=name
+
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_network_resources
+          ;;
+        create)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_network_resource
+            return 0
+          fi
+          COMMAND=nb_create_network_resource
+          ;;
+        del|delete|rm|remove)
+          COMMAND=nb_delete_network_resource
+          ;;
+        help)
+          usage
+          return 0
+          ;;
+      esac
+      ;;
+    r|ro|route|routes)
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(network_id network masquerade metric groups peer_groups)
@@ -1619,6 +1809,36 @@ main() {
           ;;
         del|delete|rm|remove)
           COMMAND=nb_delete_route
+          ;;
+        help)
+          usage
+          return 0
+          ;;
+      esac
+      ;;
+    router*|routing-peers)
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(id masquerade metric peer peer_groups)
+        COLUMN_NAMES=("ID" "MASQ" "Metric" "Peer" "Groups")
+      fi
+
+      [[ -z "$CUSTOM_SORT" ]] && SORT_BY=id
+
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_network_routers
+          ;;
+        create)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_network_router
+            return 0
+          fi
+          COMMAND=nb_create_network_router
+          ;;
+        del|delete|rm|remove)
+          COMMAND=nb_delete_network_router
           ;;
         help)
           usage
@@ -1773,6 +1993,7 @@ main() {
     return 2
   fi
 
+  echo_debug "\$ $COMMAND ${*@Q}"
   JSON_DATA="$("$COMMAND" "$@")"
 
   if [[ -z "$JSON_DATA" ]]
