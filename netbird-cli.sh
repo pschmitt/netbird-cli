@@ -56,6 +56,10 @@ usage() {
   echo
   echo "  peers       list [ID/NAME]              List peers or get a specific peer by ID or name"
   echo
+  echo "  policy      list [ID/NAME]              List policies or get a specific policy by ID or name"
+  echo "              create ARGS                 Create a policy (see --help for args)"
+  echo "              delete ID/NAME              Delete a policy by ID or name"
+  echo
   echo "  posture     list [ID/NAME]              List posture checks or get a specific check by ID or name"
   echo
   echo "  routes      list [ID/NAME]              List routes or get a specific route by ID or name"
@@ -561,6 +565,50 @@ nb_peer_id() {
   nb_list_peers | jq -er --arg peer_name "$peer_name" '
     .[] | select(.hostname == $peer_name) | .id
   '
+}
+
+# https://docs.netbird.io/api/resources/policies#list-all-policies
+# shellcheck disable=SC2120
+nb_list_policies() {
+  local endpoint="policies"
+
+  if [[ -n "$1" ]]
+  then
+    if is_nb_id "$1"
+    then
+      endpoint+="/${1}"
+    else
+      local policy_id
+      policy_id=$(nb_policy_id "$1")
+
+      if [[ -z "$policy_id" ]]
+      then
+        echo_error "Failed to determine posture check ID of '$1'"
+        return 1
+      fi
+
+      endpoint+="/${policy_id}"
+    fi
+  fi
+
+  nb_curl "$endpoint"
+}
+
+nb_policy_id() {
+  local policy_name="$1"
+  nb_list_policies | jq -er --arg policy_name "$policy_name" '
+    .[] | select(.name == $policy_name) | .id
+  '
+}
+
+nb_create_policy() {
+  echo "NOT IMPLEMENTED YET" >&2
+  return 1
+}
+
+nb_delete_policy() {
+  echo "NOT IMPLEMENTED YET" >&2
+  return 1
 }
 
 # https://docs.netbird.io/api/resources/posture-checks#list-all-posture-checks
@@ -2165,6 +2213,36 @@ main() {
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_peers
+          ;;
+        help)
+          usage
+          return 0
+          ;;
+      esac
+      ;;
+    pol*)
+      if [[ -z "$CUSTOM_COLUMNS" ]]
+      then
+        JSON_COLUMNS=(id name enabled rules)
+        COLUMN_NAMES=("ID" "Name" "Enabled" "Rules")
+      fi
+
+      [[ -z "$CUSTOM_SORT" ]] && SORT_BY=name
+
+      case "$ACTION" in
+        list|get)
+          COMMAND=nb_list_policies
+          ;;
+        create)
+          if [[ -n "$HELP_ACTION" ]]
+          then
+            usage_create_policy
+            return 0
+          fi
+          COMMAND=nb_create_policy
+          ;;
+        del|delete|rm|remove)
+          COMMAND=nb_delete_policy
           ;;
         help)
           usage
