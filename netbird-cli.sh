@@ -523,6 +523,7 @@ nb_list_dns() {
 }
 
 # https://docs.netbird.io/api/resources/peers#list-all-peers
+# https://docs.netbird.io/api/resources/peers#retrieve-a-peer
 nb_list_peers() {
   local endpoint="peers"
 
@@ -568,6 +569,7 @@ nb_peer_id() {
 }
 
 # https://docs.netbird.io/api/resources/policies#list-all-policies
+# https://docs.netbird.io/api/resources/policies#retrieve-a-policy
 # shellcheck disable=SC2120
 nb_list_policies() {
   local endpoint="policies"
@@ -601,11 +603,13 @@ nb_policy_id() {
   '
 }
 
+# https://docs.netbird.io/api/resources/policies#create-a-policy
 nb_create_policy() {
   echo "NOT IMPLEMENTED YET" >&2
   return 1
 }
 
+# https://docs.netbird.io/api/resources/policies#delete-a-policy
 nb_delete_policy() {
   echo "NOT IMPLEMENTED YET" >&2
   return 1
