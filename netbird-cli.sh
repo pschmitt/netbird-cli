@@ -78,6 +78,7 @@ usage() {
   echo "              delete USER TOKEN           Delete a token for a user by token name or ID"
   echo
   echo "  users       list [ID/NAME]              List users or get a specific user by ID or name"
+  echo
   echo "  whoami                                  Get the current user"
 }
 
