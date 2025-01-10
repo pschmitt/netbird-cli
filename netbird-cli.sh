@@ -119,6 +119,35 @@ usage_create_network_router() {
   echo "  -M, --masquerade <bool>    Enable masquerading (default: true)"
 }
 
+usage_create_policy() {
+  echo "Usage: $(basename "$0") policy create OPTIONS"
+  echo
+  echo "Options:"
+  echo "  -h, --help                   Show this help message and exit"
+  echo "  -n, --name <str>             Resource name"
+  echo "  -d, --description <str>      Description of the policy"
+  echo "  -e, --enabled <bool>         Enable the policy (default: true)"
+  echo "  -C, --posture-checks <str>   Posture check (can be specified multiple times)"
+  echo "  -r, --rules <json>           Policy rule object (can be specified multiple times)"
+  echo
+  echo "Policy Rule Example:"
+  cat <<EOM
+{
+  "name": "Default",
+  "description": "This is a default rule that allows connections between all the resources",
+  "enabled": true,
+  "action": "accept",
+  "bidirectional": true,
+  "protocol": "tcp",
+  "ports": [ "80" ],
+  "port_ranges": [ { "start": 80, "end": 320 } ],
+  "id": "ch8i4ug6lnn4g9hqv7mg",
+  "sources": [ "ch8i4ug6lnn4g9hqv797" ],
+  "destinations": [ "ch8i4ug6lnn4g9h7v7m0" ]
+}
+EOM
+}
+
 usage_create_setup_key() {
   echo "Usage: $(basename "$0") setup-key create NAME [OPTIONS]"
   echo
