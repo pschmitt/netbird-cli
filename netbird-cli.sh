@@ -109,8 +109,6 @@ usage_create_network_router() {
   echo
   echo "Options:"
   echo "  -h, --help                 Show this help message and exit"
-  echo "  -d, --description <str>    Description of the route"
-  echo "  -n, --name <str>           Router name"
   echo "  -p, --peer <peer>          Peer Identifier associated with route (conflicts with --peer-group)"
   echo "  -P, --peer-group <grp>     Peer Group (conflicts with --peer)"
   echo "  -m, --metric <int>         Route metric (default: 9999)"
@@ -634,6 +632,51 @@ nb_list_networks() {
   return 0
 }
 
+# https://docs.netbird.io/api/resources/networks#create-a-network
+nb_create_network() {
+  local args
+
+  local description
+  local name # max 40 chars?
+
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -h|--help|-\?)
+        usage_create_network
+        return 0
+        ;;
+      -d|--description)
+        description="$2"
+        shift 2
+        ;;
+      -n|--name)
+        name="$2"
+        shift 2
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  set -- "${args[@]}"
+
+  local data
+  data=$(jq -Rcsn \
+    --arg name "$name" \
+    --arg description "$description" \
+    '
+      {
+        name: $network_name,
+        description: $description
+      }
+    ')
+
+  nb_curl networks -X POST --data-raw "$data"
+}
+
 # https://docs.netbird.io/api/resources/networks#list-all-network-resources
 # shellcheck disable=SC2120
 nb_list_network_resources() {
@@ -691,6 +734,96 @@ nb_list_network_resources() {
 
   printf '%s\n' "$data"
   return 0
+}
+
+# https://docs.netbird.io/api/resources/networks#create-a-network-resource
+nb_create_network_resource() {
+  local args
+  local network="$1"
+
+  # resolve network id
+  if ! is_nb_id "$network"
+  then
+    local network_id
+    network_id=$(nb_network_id "$network")
+
+    if [[ -z "$network_id" ]]
+    then
+      echo_error "Failed to determine network ID of '$network'"
+      return 1
+    fi
+
+    network="$network_id"
+  fi
+
+  local address
+  local description
+  local groups
+  local name
+
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -h|--help|-\?)
+        usage_create_route
+        return 0
+        ;;
+      -d|--description)
+        description="$2"
+        shift 2
+        ;;
+      -n|--name)
+        name="$2"
+        shift 2
+        ;;
+      -a|--address)
+        address="$2"
+        shift 2
+        ;;
+      -g|--group*)
+        groups+=("$2")
+        shift 2
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  set -- "${args[@]}"
+
+  # Resolve groups
+  local -a resolved_groups
+  local groups_json=null
+
+  if [[ "${#groups[@]}" -gt 0 ]]
+  then
+    local g
+    for g in "${groups[@]}"
+    do
+      resolved_groups+=("$(nb_group_id "$g")")
+    done
+
+    groups_json=$(arr_to_json "${resolved_groups[@]}")
+  fi
+
+  local data
+  data=$(jq -Rcsn \
+    --arg name "$name" \
+    --arg description "$description" \
+    --arg address "$address" \
+    --argjson groups "$groups_json" \
+    '
+      {
+        name: $name,
+        description: $description,
+        address: $address,
+        groups: $groups,
+      }
+    ')
+
+  nb_curl "networks/${network}/resources" -X POST --data-raw "$data"
 }
 
 nb_delete_network_resource() {
@@ -821,6 +954,96 @@ nb_list_network_routers() {
 
   printf '%s\n' "$data"
   return 0
+}
+
+# https://docs.netbird.io/api/resources/networks#create-a-network-router
+nb_create_network_router() {
+  local args
+  local network="$1"
+
+  # resolve network id
+  if ! is_nb_id "$network"
+  then
+    local network_id
+    network_id=$(nb_network_id "$network")
+
+    if [[ -z "$network_id" ]]
+    then
+      echo_error "Failed to determine network ID of '$network'"
+      return 1
+    fi
+
+    network="$network_id"
+  fi
+
+  local peer="null"
+  local peer_groups
+  local metric # >=1 && <=9999
+  local masq
+
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -h|--help|-\?)
+        usage_create_route
+        return 0
+        ;;
+      -m|--metric)
+        metric="$2"
+        shift 2
+        ;;
+      -M|--masq*)
+        masq=$(to_bool "$2")
+        shift 2
+        ;;
+      -p|--peer)
+        peer="$2"
+        shift 2
+        ;;
+      -g|--group*)
+        groups+=("$2")
+        shift 2
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  set -- "${args[@]}"
+
+  # Resolve groups
+  local -a resolved_groups
+  local groups_json=null
+
+  if [[ "${#groups[@]}" -gt 0 ]]
+  then
+    local g
+    for g in "${groups[@]}"
+    do
+      resolved_groups+=("$(nb_group_id "$g")")
+    done
+
+    groups_json=$(arr_to_json "${resolved_groups[@]}")
+  fi
+
+  local data
+  data=$(jq -Rcsn \
+    --argjson metric "$metric" \
+    --argjson masquerade "$masq" \
+    --argjson peer "$peer" \
+    --argjson groups "$groups_json" \
+    '
+      {
+        metric: $metric,
+        masquerade: $masquerade,
+        peer: $peer,
+        peer_groups: $groups,
+      }
+    ')
+
+  nb_curl "networks/${network}/routers" -X POST --data-raw "$data"
 }
 
 # https://docs.netbird.io/api/resources/networks#delete-a-network-router
