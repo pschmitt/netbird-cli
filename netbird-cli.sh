@@ -639,8 +639,92 @@ nb_policy_id() {
 
 # https://docs.netbird.io/api/resources/policies#create-a-policy
 nb_create_policy() {
-  echo "NOT IMPLEMENTED YET" >&2
-  return 1
+  local args
+
+  local name
+  local description
+  local enabled=true
+  local source_posture_checks
+  local rules_json='[]'
+
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -h|--help|-\?)
+        usage_create_policy
+        return 0
+        ;;
+      -n|--name)
+        name="$2"
+        shift 2
+        ;;
+      -d|--description)
+        description="$2"
+        shift 2
+        ;;
+      -p|--posture-checks|--source-posture-checks)
+        source_posture_checks+=("$2")
+        shift 2
+        ;;
+      -r|--rules)
+        # TODO Make this more user-friendly
+        if ! rules_json=$(jq -er --argjson rule "$2" \
+          '. + [$rule]' <<< "$rules_json")
+        then
+          echo_error "Invalid rules JSON provided"
+          return 2
+        fi
+        shift 2
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  set -- "${args[@]}"
+
+  if [[ -z "$name" || "$rules_json" == '[]' ]]
+  then
+    echo_error "Missing required arguments (name and rules are required)"
+    return 1
+  fi
+
+  # Resolve posture checks
+  local -a resolved_posture_checks
+  local posture_checks_json=null
+  if [[ "${#source_posture_checks[@]}" -gt 0 ]]
+  then
+    local pc
+    for pc in "${source_posture_checks[@]}"
+    do
+      resolved_posture_checks+=("$(nb_posture_check_id "$pc")")
+    done
+
+    posture_checks_json=$(arr_to_json "${resolved_posture_checks[@]}")
+  fi
+
+  echo_info "Creating policy $name"
+
+  local data
+  data=$(jq -Rcsn \
+    --arg name "$name" \
+    --arg description "$description" \
+    --argjson enabled "$enabled" \
+    --argjson source_posture_checks "$posture_checks_json" \
+    --argjson rules "$rules_json" \
+    '
+      {
+        name: $name,
+        description: $description,
+        enabled: $enabled,
+        source_posture_checks: $source_posture_checks,
+        rules: $rules
+      }
+    ')
+
+  nb_curl policies -X POST --data-raw "$data"
 }
 
 # https://docs.netbird.io/api/resources/policies#delete-a-policy
