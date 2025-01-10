@@ -3,20 +3,22 @@
 NB_API_TOKEN="${NB_API_TOKEN:-}"
 NB_MANAGEMENT_URL="${NB_MANAGEMENT_URL:-https://api.netbird.cloud}"
 
+COMPACT="${COMPACT:-}"
 DEBUG="${DEBUG:-}"
-RESOLVE="${RESOLVE:-}"
-OUTPUT="${OUTPUT:-pretty}"
+JQ_ARGS=()
 NO_COLOR="${NO_COLOR:-}"
 NO_HEADER="${NO_HEADER:-}"
-COMPACT="${COMPACT:-}"
+OUTPUT="${OUTPUT:-pretty}"
+RETRIES="${RETRIES:-3}"
+RESOLVE="${RESOLVE:-}"
 SORT_BY="${SORT_BY:-name}"
 WITH_ID_COL="${WITH_ID_COL:-}"
-JQ_ARGS=()
 
 usage() {
   echo "Usage: $(basename "$0") [options] ITEM [ACTION] [ARGS...]"
   echo
   echo "Options:"
+  echo
   echo "  -h, --help           Show this help message and exit"
   echo "  --debug              Enable debug output"
   echo "  --no-warnings        Suppress warning messages"
@@ -32,8 +34,10 @@ usage() {
   echo "  --columns <cols>     Set the columns to display (comma-separated)"
   echo "  -s, --sort <col>     Sort by the specified column"
   echo "  -r, --resolve        Resolve group names for setup keys"
+  echo "  --retries <int>      Number of curl retries to attempt (default: 3)"
   echo
   echo "Items and Actions:"
+  echo
   echo "  accounts    list                        List accounts"
   echo
   echo "  country     list [COUNTRY]              List countries or get cities for a specific country"
@@ -285,7 +289,7 @@ nb_curl() {
   shift
   local url="${NB_MANAGEMENT_URL}/api/${endpoint}"
 
-  curl -fsSL --retry 5 --retry-all-errors \
+  curl -fsSL --retry "$RETRIES" --retry-all-errors \
     -H "Authorization: Token $NB_API_TOKEN" \
     -H "Accept: application/json" \
     -H "Content-Type: application/json" \
@@ -2062,6 +2066,10 @@ main() {
       -r|--resolve)
         RESOLVE=1
         shift
+        ;;
+      --retries)
+        RETRIES="$2"
+        shift 2
         ;;
       --)
         shift
