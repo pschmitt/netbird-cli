@@ -84,6 +84,39 @@ usage_create_group() {
   echo "  -h, --help  Show this help message and exit"
 }
 
+usage_create_network() {
+  echo "Usage: $(basename "$0") network create OPTIONS"
+  echo
+  echo "Options:"
+  echo "  -h, --help                 Show this help message and exit"
+  echo "  -d, --description <str>    Description of the route"
+  echo "  -n, --name <str>           Network name"
+}
+
+usage_create_network_resource() {
+  echo "Usage: $(basename "$0") resource create NETWORK OPTIONS"
+  echo
+  echo "Options:"
+  echo "  -h, --help                 Show this help message and exit"
+  echo "  -d, --description <str>    Description of the route"
+  echo "  -n, --name <str>           Resource name"
+  echo "  -a, --address <str>        Network resource address (eg: 127.0.99.1/32)"
+  echo "  -g, --groups <grp>         Group(s) to assign the resource to (can be specified multiple times)"
+}
+
+usage_create_network_router() {
+  echo "Usage: $(basename "$0") router create NETWORK OPTIONS"
+  echo
+  echo "Options:"
+  echo "  -h, --help                 Show this help message and exit"
+  echo "  -d, --description <str>    Description of the route"
+  echo "  -n, --name <str>           Router name"
+  echo "  -p, --peer <peer>          Peer Identifier associated with route (conflicts with --peer-group)"
+  echo "  -P, --peer-group <grp>     Peer Group (conflicts with --peer)"
+  echo "  -m, --metric <int>         Route metric (default: 9999)"
+  echo "  -M, --masquerade <bool>    Enable masquerading (default: true)"
+}
+
 usage_create_setup_key() {
   echo "Usage: $(basename "$0") setup-key create NAME [OPTIONS]"
   echo
