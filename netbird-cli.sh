@@ -935,7 +935,7 @@ nb_create_network_resource() {
   do
     case "$1" in
       -h|--help|-\?)
-        usage_create_route
+        usage_create_network_resource
         return 0
         ;;
       -d|--description)
@@ -1155,7 +1155,7 @@ nb_create_network_router() {
   do
     case "$1" in
       -h|--help|-\?)
-        usage_create_route
+        usage_create_network_router
         return 0
         ;;
       -m|--metric)
