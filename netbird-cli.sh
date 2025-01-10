@@ -660,6 +660,77 @@ nb_list_network_resources() {
   return 0
 }
 
+nb_delete_network_resource() {
+  local network="$1"
+  local network_resource="$2"
+
+  if [[ -z "$network" ]]
+  then
+    echo_error "Missing network ID/name"
+    return 2
+  fi
+
+  if [[ -z "$network_resource" ]]
+  then
+    echo_error "Missing network router ID/name"
+    return 2
+  fi
+
+  if ! is_nb_id "$network"
+  then
+    network_id=$(nb_network_id "$network")
+
+    if [[ -z "$network_id" ]]
+    then
+      echo_error "Failed to determine network ID of '$network'"
+      return 1
+    fi
+
+    network="$network_id"
+  fi
+
+  if ! is_nb_id "$network_resource"
+  then
+    network_resource_id=$(nb_network_resource_id "$network")
+
+    if [[ -z "$network_resource_id" ]]
+    then
+      echo_error "Failed to determine network router ID of '$network'"
+      return 1
+    fi
+
+    network_resource="$network_id"
+  fi
+
+  nb_curl "networks/${network}/routers/${network_resource}" -X DELETE
+}
+
+# https://docs.netbird.io/api/resources/networks#delete-a-network
+nb_delete_network() {
+  local network="$1"
+
+  if [[ -z "$network" ]]
+  then
+    echo_error "Missing network ID/name"
+    return 2
+  fi
+
+  if ! is_nb_id "$network"
+  then
+    network_id=$(nb_network_id "$network")
+
+    if [[ -z "$network_id" ]]
+    then
+      echo_error "Failed to determine network ID of '$network'"
+      return 1
+    fi
+
+    network="$network_id"
+  fi
+
+  nb_curl "networks/${network}" -X DELETE
+}
+
 # https://docs.netbird.io/api/resources/networks#list-all-network-routers
 # shellcheck disable=SC2120
 nb_list_network_routers() {
@@ -717,6 +788,52 @@ nb_list_network_routers() {
 
   printf '%s\n' "$data"
   return 0
+}
+
+# https://docs.netbird.io/api/resources/networks#delete-a-network-router
+nb_delete_network_router() {
+  local network="$1"
+  local network_router="$2"
+
+  if [[ -z "$network" ]]
+  then
+    echo_error "Missing network ID/name"
+    return 2
+  fi
+
+  if ! is_nb_id "$network"
+  then
+    network_id=$(nb_network_id "$network")
+
+    if [[ -z "$network_id" ]]
+    then
+      echo_error "Failed to determine network ID of '$network'"
+      return 1
+    fi
+
+    network="$network_id"
+  fi
+
+  if [[ -z "$network_router" ]]
+  then
+    echo_error "Missing network router ID/name"
+    return 2
+  fi
+
+  if ! is_nb_id "$network_router"
+  then
+    network_router_id=$(nb_network_router_id "$network")
+
+    if [[ -z "$network_router_id" ]]
+    then
+      echo_error "Failed to determine network router ID of '$network'"
+      return 1
+    fi
+
+    network_router="$network_id"
+  fi
+
+  nb_curl "networks/${network}/routers/${network_router}" -X DELETE
 }
 
 # https://docs.netbird.io/api/resources/routes#list-all-routes
