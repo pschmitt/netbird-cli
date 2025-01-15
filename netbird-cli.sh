@@ -1231,7 +1231,7 @@ nb_create_network_router() {
   fi
 
   local peer="null"
-  local peer_groups
+  local peer_groups="null"
   local metric=9999 # >=1 && <=9999
   local masq=true
 
@@ -1254,7 +1254,7 @@ nb_create_network_router() {
         peer="$2"
         shift 2
         ;;
-      -g|--group*)
+      -g|--group*|--peer-group*)
         groups+=("$2")
         shift 2
         ;;
