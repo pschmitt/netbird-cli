@@ -922,7 +922,7 @@ nb_create_network() {
     --arg description "$description" \
     '
       {
-        name: $network_name,
+        name: $name,
         description: $description
       }
     ')
