@@ -1147,6 +1147,7 @@ nb_delete_network() {
     network="$network_id"
   fi
 
+  echo_info "Deleting network $network"
   nb_curl "networks/${network}" -X DELETE
 }
 
@@ -1231,8 +1232,8 @@ nb_create_network_router() {
 
   local peer="null"
   local peer_groups
-  local metric # >=1 && <=9999
-  local masq
+  local metric=9999 # >=1 && <=9999
+  local masq=true
 
   while [[ -n "$*" ]]
   do
