@@ -736,6 +736,36 @@ nb_create_policy() {
     posture_checks_json=$(arr_to_json "${resolved_posture_checks[@]}")
   fi
 
+  # Resolve groups in rules
+  local src_groups dest_groups
+
+  local g rj rules_json_resolved=[]
+  local src_group_ids dest_group_ids
+  for rj in $(jq -erc '.[]' <<< "$rules_json")
+  do
+    mapfile -t src_groups < <(jq -er '.sources[]' <<< "$rj")
+    mapfile -t dest_groups < <(jq -er '.destinations[]' <<< "$rj")
+
+    for g in "${src_groups[@]}"
+    do
+      src_group_ids+=("$(nb_group_id "$g")")
+    done
+
+    for g in "${dest_groups[@]}"
+    do
+      dest_group_ids+=("$(nb_group_id "$g")")
+    done
+
+    rj_resolved=$(jq -er \
+      --argjson src "$(arr_to_json "${src_group_ids[@]}")" \
+      --argjson dest "$(arr_to_json "${dest_group_ids[@]}")" \
+      '.sources = $src | .destinations = $dest' \
+      <<< "$rj"
+    )
+    rules_json_resolved=$(jq -er --argjson rule "$rj_resolved" \
+      '. + [$rule]' <<< "$rules_json_resolved")
+  done
+
   echo_info "Creating policy $name"
 
   local data
@@ -744,7 +774,7 @@ nb_create_policy() {
     --arg description "$description" \
     --argjson enabled "$enabled" \
     --argjson source_posture_checks "$posture_checks_json" \
-    --argjson rules "$rules_json" \
+    --argjson rules "$rules_json_resolved" \
     '
       {
         name: $name,
