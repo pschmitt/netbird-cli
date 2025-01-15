@@ -21,6 +21,7 @@ usage() {
   echo
   echo "  -h, --help           Show this help message and exit"
   echo "  --debug              Enable debug output"
+  echo "  --trace              Enable trace output (implies --debug)"
   echo "  --no-warnings        Suppress warning messages"
   echo "  -u, --url <url>      Set the NetBird API URL (NB_MANAGEMENT_URL)"
   echo "  -t, --token <token>  Set the NetBird API token (NB_API_TOKEN)"
@@ -133,7 +134,7 @@ usage_create_policy() {
   echo "  -d, --description <str>      Description of the policy"
   echo "  -e, --enabled <bool>         Enable the policy (default: true)"
   echo "  -C, --posture-checks <str>   Posture check (can be specified multiple times)"
-  echo "  -r, --rules <json>           Policy rule object (can be specified multiple times)"
+  echo "  -r, --rule <json>            Policy rule object (can be specified multiple times)"
   echo
   echo "Policy Rule Example:"
   cat <<EOM
@@ -666,7 +667,7 @@ nb_create_policy() {
         source_posture_checks+=("$2")
         shift 2
         ;;
-      -r|--rules)
+      -r|--rule|--rules)
         # TODO Make this more user-friendly
         if ! rules_json=$(jq -er --argjson rule "$2" \
           '. + [$rule]' <<< "$rules_json")
@@ -2082,6 +2083,11 @@ main() {
         ;;
       --debug)
         DEBUG=1
+        shift
+        ;;
+      --trace)
+        DEBUG=1
+        set -x
         shift
         ;;
       --no-warnings)
