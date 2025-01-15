@@ -789,9 +789,31 @@ nb_create_policy() {
 }
 
 # https://docs.netbird.io/api/resources/policies#delete-a-policy
+# shellcheck disable=SC2317
 nb_delete_policy() {
-  echo "NOT IMPLEMENTED YET" >&2
-  return 1
+  local policy="$1"
+
+  if [[ -z "$policy" ]]
+  then
+    echo_error "Missing policy ID/name"
+    return 2
+  fi
+
+  if ! is_nb_id "$policy"
+  then
+    policy_id=$(nb_policy_id "$policy")
+
+    if [[ -z "$policy_id" ]]
+    then
+      echo_error "Failed to determine policy ID of '$policy'"
+      return 1
+    fi
+
+    policy="$policy_id"
+  fi
+
+  echo_info "Deleting policy $policy"
+  nb_curl "policies/${policy}" -X DELETE
 }
 
 # https://docs.netbird.io/api/resources/posture-checks#list-all-posture-checks
