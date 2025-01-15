@@ -647,6 +647,7 @@ nb_create_policy() {
   local enabled=true
   local source_posture_checks
   local rules_json='[]'
+  local rule
 
   while [[ -n "$*" ]]
   do
@@ -668,8 +669,37 @@ nb_create_policy() {
         shift 2
         ;;
       -r|--rule|--rules)
+        rule="$2"
+
+        if [[ "$rule" == @* ]]
+        then
+          if ! rule=$(cat "${rule#@}")
+          then
+            echo_error "Failed to read rule file ${rule#@}"
+            return 1
+          fi
+        fi
+
         # TODO Make this more user-friendly
-        if ! rules_json=$(jq -er --argjson rule "$2" \
+        if ! rules_json=$(jq -er --argjson rule "$rule" \
+          '. + [$rule]' <<< "$rules_json")
+        then
+          echo_error "Invalid rules JSON provided"
+          return 2
+        fi
+        shift 2
+        ;;
+      # same as above, but explicitly reads from file
+      --rule-file|--rules-file)
+        rule="$2"
+
+        if ! rule=$(cat "$rule")
+        then
+          echo_error "Failed to read rule file $rule"
+          return 1
+        fi
+
+        if ! rules_json=$(jq -er --argjson rule "$rule" \
           '. + [$rule]' <<< "$rules_json")
         then
           echo_error "Invalid rules JSON provided"
