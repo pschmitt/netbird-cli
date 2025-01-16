@@ -424,8 +424,30 @@ nb_group_id() {
 }
 
 # Resolve group IDs in JSON data
-# usage: nb_resolve_groups <<< "$JSON_DATA"
+# usage: nb_resolve_groups [--inverse] [-k FIELD] <<< "$JSON_DATA"
+# shellcheck disable=SC2120
 nb_resolve_groups() {
+  local keys=("auto_groups" "groups" "peer_groups")
+  local inverse=false
+
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -f|--field|-k|--key)
+        keys+=("$2")
+        shift 2
+        ;;
+      -i|--inverse)
+        inverse=true
+        shift
+        ;;
+      *)
+        echo_error "Invalid argument: $1"
+        return 1
+        ;;
+    esac
+  done
+
   local groups
   groups=$(nb_list_groups)
 
@@ -435,41 +457,56 @@ nb_resolve_groups() {
     return 1
   fi
 
-  jq -er --argjson group_data "$groups" '
-    # Create a lookup map from group_data
-    def groups_map:
-      ($group_data | map({key: .id, value: .}) | from_entries);
+  local keys_json
+  keys_json=$(arr_to_json "${keys[@]}")
 
-    # Expand group IDs to full group objects for the specified attributes
-    def expand_group_ids(gmap; attrs):
-      reduce attrs[] as $attr (
-        .;
-        if has($attr)
-        then
-          .[$attr] = (
-          if (
-              (.[ $attr ] | type) == "array"
-              and
-              all(.[ $attr ][]; type == "string")
+  echo_debug "Processing with $keys_json (inverse: $inverse)"
+
+  jq -er \
+    --argjson keys "$keys_json" \
+    --argjson group_data "$groups" \
+    --arg inverse "$inverse" \
+    '
+      # Create lookup maps
+      def groups_map_by_id: ($group_data | map({key: .id, value: .}) | from_entries);
+      def groups_map_by_name: ($group_data | map({key: .name, value: .id}) | from_entries);
+
+      # Perform the operation (expand or inverse) based on the inverse flag
+      def process_groups(gmap_expand; gmap_inverse; attrs; inverse):
+        reduce attrs[] as $attr (
+          .;
+          if has($attr)
+          then
+            .[$attr] = (
+              if (.[ $attr ] | type) == "array" and all(.[ $attr ][]; type == "string")
+              then
+                # Map group data based on the mode
+                if inverse
+                then
+                  .[$attr] | map(gmap_inverse[.] // .)
+                else
+                  .[$attr] | map(gmap_expand[.] // .)
+                end
+              else
+                # If not an array, keep the original value
+                .[$attr]
+              end
             )
-            then
-              # Map group IDs to objects or keep original if not found
-              .[$attr] | map(gmap[.] // .)
-            else
-              # If not an array, keep the original value
-              .[$attr]
-            end
-          )
-        else
-          .
-        end
-      );
+          else
+            .
+          end
+        );
 
-    # Expand group attrs
-    map(
-      expand_group_ids(groups_map; ["auto_groups", "groups", "peer_groups"])
-    )
-  '
+      # Process attributes
+      map(
+        process_groups(
+          groups_map_by_id;
+          groups_map_by_name;
+          $keys;
+          $inverse == "true"
+        )
+      )
+    '
 }
 
 # https://docs.netbird.io/api/resources/groups#create-a-group
@@ -737,37 +774,11 @@ nb_create_policy() {
   fi
 
   # Resolve groups in rules
-  local rj_arr
-  mapfile -t rj_arr < <(jq -erc '.[]' <<< "$rules_json")
-
-  local src_groups dest_groups
-  local g rj rules_json_resolved=[]
-  local src_group_ids dest_group_ids
-
-  for rj in "${rj_arr[@]}"
-  do
-    mapfile -t src_groups < <(jq -er '.sources[]' <<< "$rj")
-    mapfile -t dest_groups < <(jq -er '.destinations[]' <<< "$rj")
-
-    for g in "${src_groups[@]}"
-    do
-      src_group_ids+=("$(nb_group_id "$g")")
-    done
-
-    for g in "${dest_groups[@]}"
-    do
-      dest_group_ids+=("$(nb_group_id "$g")")
-    done
-
-    rj_resolved=$(jq -er \
-      --argjson src "$(arr_to_json "${src_group_ids[@]}")" \
-      --argjson dest "$(arr_to_json "${dest_group_ids[@]}")" \
-      '.sources = $src | .destinations = $dest' \
-      <<< "$rj"
-    )
-    rules_json_resolved=$(jq -er --argjson rule "$rj_resolved" \
-      '. + [$rule]' <<< "$rules_json_resolved")
-  done
+  local rules_json_resolved
+  rules_json_resolved=$(nb_resolve_groups --inverse \
+    -k sources \
+    -k destinations \
+    <<< "$rules_json")
 
   echo_info "Creating policy $name"
 
