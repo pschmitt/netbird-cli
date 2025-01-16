@@ -724,7 +724,7 @@ nb_create_policy() {
 
   # Resolve posture checks
   local -a resolved_posture_checks
-  local posture_checks_json=null
+  local posture_checks_json='[]'
   if [[ "${#source_posture_checks[@]}" -gt 0 ]]
   then
     local pc
