@@ -958,12 +958,16 @@ nb_list_network_resources() {
     mapfile -t networks < <(nb_list_networks | jq -cer '.[]')
     for net in "${networks[@]}"
     do
-      net_id=$(jq -er '.id' <<< "$net")
       # Recurse over all
-      nb_list_network_resources "$net_id" | \
+      {
+        net_id=$(jq -er '.id' <<< "$net")
+        nb_list_network_resources "$net_id" | \
         jq --argjson net "$net" '.[].network = $net'
+      } &
     done | jq -es add
-    return "$?"
+    local rc="$?"
+    wait
+    return "$rc"
   fi
 
   if is_nb_id "$1"
@@ -1190,19 +1194,16 @@ nb_list_network_routers() {
     mapfile -t networks < <(nb_list_networks | jq -cer '.[]')
     for net in "${networks[@]}"
     do
-      net_id=$(jq -er '.id' <<< "$net")
       # Recurse over all
-      nb_list_network_routers "$net_id" | \
-        jq --argjson net "$net" '
-          [
-            .[] |
-            .network = $net |
-            # network_name is only here for sorting
-            .network_name = $net.name
-          ]
-        '
+      {
+        net_id=$(jq -er '.id' <<< "$net")
+        nb_list_network_routers "$net_id" | \
+        jq --argjson net "$net" '.[].network = $net'
+      } &
     done | jq -es add
-    return "$?"
+    local rc="$?"
+    wait
+    return "$rc"
   fi
 
   if is_nb_id "$1"
