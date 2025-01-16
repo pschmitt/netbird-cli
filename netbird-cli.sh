@@ -259,10 +259,12 @@ colorizecolumns() {
   )
   local reset=$'\033[0m'
   local bold_red=$'\033[1;31m'
+  local bold_green=$'\033[1;32m'
 
   awk \
     -v reset="$reset" \
     -v col_colors="${colors[*]}" \
+    -v bold_green="$bold_green" \
     -v bold_red="$bold_red" \
     '
       BEGIN {
@@ -282,6 +284,8 @@ colorizecolumns() {
           # NOTE this will wrongly color items that are literally named "false"
           if (fieldVal == "false") {
             fields[i] = bold_red "FALSE" reset # uppercase for visibility
+          } else if (fieldVal == "true") {
+            fields[i] = bold_green "TRUE" reset # uppercase for visibility
           } else {
             # color based on column index
             colorIndex = (i - 1) % n
