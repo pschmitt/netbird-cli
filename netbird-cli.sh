@@ -511,15 +511,25 @@ nb_resolve() {
     '
 }
 
-nb_resolve_groups() {
-  nb_resolve groups auto_groups groups peer_groups
+nb_resolve_all() {
+  # TODO Only resolve if adequate, for eg we don't need to attempt to resolve
+  # network_resources when querying peers
+  # -> add RESOLVE_OBJECTS=(groups routers ...)
+  nb_resolve_groups | \
+    nb_resolve_network_routers | \
+    nb_resolve_network_resources
 }
 
-nb_resolve_routers() {
+nb_resolve_groups() {
+  nb_resolve groups \
+    auto_groups groups peer_groups
+}
+
+nb_resolve_network_routers() {
   nb_resolve network_routers routers
 }
 
-nb_resolve_resources() {
+nb_resolve_network_resources() {
   nb_resolve network_resources resources
 }
 
@@ -1212,7 +1222,13 @@ nb_list_network_routers() {
       {
         net_id=$(jq -er '.id' <<< "$net")
         nb_list_network_routers "$net_id" | \
-        jq --argjson net "$net" '.[].network = $net'
+        jq --argjson net "$net" '
+          [
+            .[] |
+            .network = $net |
+            .name = (.id  + "@" + $net.name)
+          ]
+        '
       } &
     done | jq -es add
     local rc="$?"
@@ -2799,12 +2815,7 @@ main() {
 
   if [[ -n "$RESOLVE" && -z "$NO_RESOLVE" ]]
   then
-    JSON_DATA="$(nb_resolve_groups <<< "$JSON_DATA")"
-    # TODO Only resolve if adequate, for eg we don't need this when quering peers
-    # -> add RESOLVE_OBJECTS=(groups routers ...)
-    JSON_DATA="$(nb_resolve_resources <<< "$JSON_DATA")"
-    # FIXME Below leads to errors in the pretty/sort func
-    # JSON_DATA="$(nb_resolve_routers <<< "$JSON_DATA")"
+    JSON_DATA="$(nb_resolve_all <<< "$JSON_DATA")"
   fi
 
   case "$OUTPUT" in
