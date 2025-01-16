@@ -19,6 +19,7 @@ WITH_ID_COL="${WITH_ID_COL:-}"
 declare -A OBJECT_RESOLVERS=(
   [all]="groups"
   [network]="network_resources,network_routers"
+  [router]="groups"
 )
 
 usage() {
