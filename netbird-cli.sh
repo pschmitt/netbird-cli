@@ -586,15 +586,6 @@ nb_resolve_lazy() {
   printf '%s\n' "$data"
 }
 
-nb_resolve_all() {
-  # TODO Only resolve if adequate, for eg we don't need to attempt to resolve
-  # network_resources when querying peers
-  # -> add RESOLVE_OBJECTS=(groups routers ...)
-  nb_resolve_groups | \
-    nb_resolve_network_routers | \
-    nb_resolve_network_resources
-}
-
 nb_resolve_groups() {
   nb_resolve groups \
     auto_groups groups peer_groups
