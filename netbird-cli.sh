@@ -961,14 +961,7 @@ nb_list_network_resources() {
       net_id=$(jq -er '.id' <<< "$net")
       # Recurse over all
       nb_list_network_resources "$net_id" | \
-        jq --argjson net "$net" '
-          [
-            .[] |
-            .network = $net |
-            # network_name is only here for sorting
-            .network_name = $net.name
-          ]
-        '
+        jq --argjson net "$net" '.[].network = $net'
     done | jq -es add
     return "$?"
   fi
@@ -2135,66 +2128,69 @@ pretty_output() {
       sort_reverse=true
     fi
 
+    echo_debug "sort by: $sort_by (reverse: $sort_reverse)"
+
     jq -er \
       --arg sort_by "$sort_by" \
       --argjson sort_reverse "$sort_reverse" \
       --argjson cols_json "$columns_json_arr" \
       --argjson compact "$compact" '
-      def extractFields:
-        . as $obj |
-        reduce $cols_json[] as $field (
-          {}; . + {
-            ($field | gsub("\\."; "_")): $obj | getpath($field / ".")
-          }
-        );
+        def extractFields:
+          . as $obj
+          | reduce $cols_json[] as $field (
+              {}
+            ; . + {
+                ($field | gsub("\\."; "_")):
+                  $obj | getpath($field | split("."))
+              }
+          );
 
-      "N/A" as $NA |
+        def sortByKey(key):
+          sort_by(
+            ( getpath(key | split(".")) ) as $v
+            | if $v | type == "string"
+              then $v | ascii_downcase
+              else $v
+              end
+          );
 
-      . |
-      if (. | type == "array")
-      then
-        sort_by(
-          if ((.[ $sort_by ] | type) == "string")
+        "N/A" as $NA
+        | if type == "array"
           then
-            (.[ $sort_by ] | ascii_downcase)
+            sortByKey($sort_by)
+            | if $sort_reverse then reverse else . end
+            | map(extractFields)[]
           else
-            .[ $sort_by ]
+            extractFields
           end
-        ) | (if $sort_reverse then reverse else . end) | map(extractFields)[]
-      else
-        extractFields
-      end |
-      map(
-        if (
-            (. | type == "null") or
-            ((. | type == "string") and ((. | length) == 0))
-          )
-        then
-          $NA
-        elif (. | type == "array")
-        then
-          if (. | length) == 0
+        | map(
+          if (type == "null") or (type == "string" and (length == 0))
           then
             $NA
-          else
-            if all(.[]; type == "object" and has("name"))
+          elif type == "array"
+          then
+            if length == 0
             then
-              40 as $maxwidth |
-              [.[].name] | sort | join(" ") as $out |
-              if ($compact and (($out | length) > $maxwidth))
-              then
-                $out[0:$maxwidth] + "…"
-              else
-                $out
-              end
+              $NA
+            elif all(.[]; type == "object" and has("name"))
+            then
+              40 as $maxwidth
+              | [.[].name]
+              | sort
+              | join(" ") as $out
+              | if $compact and ($out | length) > $maxwidth
+                then
+                  $out[0:$maxwidth] + "…"
+                else
+                  $out
+                end
             else
-              (. | join(", "))
+              join(", ")
             end
+          else
+            .
           end
-        else
-          .
-        end
-      ) | @tsv
+        ) | @tsv
     ' | colorizecolumns
   } | column -t -s '	'
 }
@@ -2539,7 +2535,7 @@ main() {
         list|get)
           JSON_COLUMNS=(network.name "${JSON_COLUMNS[@]}")
           COLUMN_NAMES=(Network "${COLUMN_NAMES[@]}")
-          [[ -z "$CUSTOM_SORT" ]] && SORT_BY=network_name
+          [[ -z "$CUSTOM_SORT" ]] && SORT_BY=network.name
           COMMAND=nb_list_network_resources
           ;;
         create)
@@ -2603,7 +2599,7 @@ main() {
           COMMAND=nb_list_network_routers
           JSON_COLUMNS=(network.name "${JSON_COLUMNS[@]}")
           COLUMN_NAMES=(Network "${COLUMN_NAMES[@]}")
-          [[ -z "$CUSTOM_SORT" ]] && SORT_BY=network_name
+          [[ -z "$CUSTOM_SORT" ]] && SORT_BY=network.name
           ;;
         create)
           if [[ -n "$HELP_ACTION" ]]
