@@ -11,8 +11,15 @@ NO_HEADER="${NO_HEADER:-}"
 OUTPUT="${OUTPUT:-pretty}"
 RETRIES="${RETRIES:-3}"
 RESOLVE="${RESOLVE:-}"
+NO_RESOLVE="${NO_RESOLVE:-}"
 SORT_BY="${SORT_BY:-name}"
 WITH_ID_COL="${WITH_ID_COL:-}"
+
+# NOTE keys are singular, not plural
+declare -A OBJECT_RESOLVERS=(
+  [all]="groups"
+  [network]="network_resources,network_routers"
+)
 
 usage() {
   echo "Usage: $(basename "$0") [options] ITEM [ACTION] [ARGS...]"
@@ -217,7 +224,7 @@ echo_dryrun() {
 }
 
 arr_to_json() {
-  printf '%s\n' "$@" | jq -Rn '[inputs]'
+  printf '%s\n' "$@" | jq -cRn '[inputs]'
 }
 
 to_bool() {
@@ -509,6 +516,55 @@ nb_resolve() {
         process_fields(.; $keys; object_map_by_id)
       )
     '
+}
+
+# shellcheck disable=SC2120
+nb_resolve_lazy() {
+  # The user can specify a "key", defaulting to "all".
+  local key="${1:-all}"
+
+  # Look up the comma-separated list in OBJECT_RESOLVERS
+  local resolvers="${OBJECT_RESOLVERS[$key]}"
+
+  # If no entry in the map, fallback or do nothing
+  if [[ -z "$resolvers" ]]
+  then
+    echo_debug "No resolvers mapped for key=$key; skipping resolution."
+    cat  # just pass through
+    return 0
+  fi
+
+  echo_debug "Running resolvers for key=$key: $resolvers"
+
+  # Split the comma list into an array
+  local items
+  IFS=',' read -ra items <<< "$resolvers"
+
+  # We'll read JSON from stdin and apply each resolver in turn
+  local data
+  data="$(cat)"
+
+  local resolver
+  for resolver in "${items[@]}"
+  do
+    case "$resolver" in
+      groups)
+        data="$(nb_resolve_groups <<< "$data")"
+        ;;
+      network_routers)
+        data="$(nb_resolve_network_routers <<< "$data")"
+        ;;
+      network_resources)
+        data="$(nb_resolve_network_resources <<< "$data")"
+        ;;
+      *)
+        echo_warning "Unknown resolver '$resolver'; skipping"
+        ;;
+    esac
+  done
+
+  # Output the final result
+  printf '%s\n' "$data"
 }
 
 nb_resolve_all() {
@@ -2317,6 +2373,10 @@ main() {
         RESOLVE=1
         shift
         ;;
+      -R|--no-resolve|--nores*)
+        NO_RESOLVE=1
+        shift
+        ;;
       --retries)
         RETRIES="$2"
         shift 2
@@ -2366,6 +2426,7 @@ main() {
 
   case "$API_ITEM" in
     a|acc*)
+      API_OBJECT="account"
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_accounts
@@ -2377,6 +2438,7 @@ main() {
       esac
       ;;
     country*|geo*)
+      API_OBJECT="country"
       if [[ -z "$*" ]]
       then
         if [[ -z "$CUSTOM_COLUMNS" ]]
@@ -2408,6 +2470,7 @@ main() {
       esac
       ;;
     d|dns*|ns*|nameser*)
+      API_OBJECT="dns"
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_dns
@@ -2419,6 +2482,7 @@ main() {
       esac
       ;;
     e|event*)
+      API_OBJECT="event"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(activity initiator_name timestamp)
@@ -2438,6 +2502,7 @@ main() {
       esac
       ;;
     g|gr*)
+      API_OBJECT="group"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(name peers_count peers)
@@ -2466,6 +2531,7 @@ main() {
       esac
       ;;
     n|net*)
+      API_OBJECT="network"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(name description resources routers routing_peers_count)
@@ -2496,6 +2562,7 @@ main() {
       esac
       ;;
     p|peer*)
+      API_OBJECT="peer"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(hostname ip dns_label connected version groups)
@@ -2513,10 +2580,11 @@ main() {
       esac
       ;;
     pol*)
+      API_OBJECT="policy"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(name description enabled rules)
-        COLUMN_NAMES=("Name" "description" "Enabled" "Rules")
+        COLUMN_NAMES=("Name" "Description" "Enabled" "Rules")
       fi
 
       [[ -z "$CUSTOM_SORT" ]] && SORT_BY=name
@@ -2543,6 +2611,7 @@ main() {
       esac
       ;;
     postu*)
+      API_OBJECT="posture_check"
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_posture_checks
@@ -2554,6 +2623,7 @@ main() {
       esac
       ;;
     res*)
+      API_OBJECT="network_resource"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(name type groups description address)
@@ -2587,6 +2657,7 @@ main() {
       esac
       ;;
     r|ro|route|routes)
+      API_OBJECT="route"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(network_id network masquerade metric groups peer_groups)
@@ -2617,6 +2688,7 @@ main() {
       esac
       ;;
     router*|routing-peers)
+      API_OBJECT="router"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(masquerade metric peer peer_groups)
@@ -2650,6 +2722,7 @@ main() {
       esac
       ;;
     s|setup*)
+      API_OBJECT="setup-key"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(name auto_groups state key)
@@ -2692,6 +2765,7 @@ main() {
       esac
       ;;
     t|token*)
+      API_OBJECT="token"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(name created_at expiration_date last_used)
@@ -2720,6 +2794,7 @@ main() {
       esac
       ;;
     u|user*)
+      API_OBJECT="user"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(name role auto_groups)
@@ -2737,6 +2812,7 @@ main() {
       esac
       ;;
     w|whoami|self|me)
+      API_OBJECT="whoami"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
         JSON_COLUMNS=(name role auto_groups)
@@ -2813,9 +2889,9 @@ main() {
     JSON_DATA=$(jq -s '.' <<< "$JSON_DATA")
   fi
 
-  if [[ -n "$RESOLVE" && -z "$NO_RESOLVE" ]]
+  if [[ -n "$RESOLVE" && -z "$NO_RESOLVE" ]] # negativity wins
   then
-    JSON_DATA="$(nb_resolve_all <<< "$JSON_DATA")"
+    JSON_DATA="$(nb_resolve_lazy "$API_OBJECT" <<< "$JSON_DATA")"
   fi
 
   case "$OUTPUT" in
