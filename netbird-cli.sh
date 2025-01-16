@@ -2800,6 +2800,8 @@ main() {
   if [[ -n "$RESOLVE" && -z "$NO_RESOLVE" ]]
   then
     JSON_DATA="$(nb_resolve_groups <<< "$JSON_DATA")"
+    # TODO Only resolve if adequate, for eg we don't need this when quering peers
+    # -> add RESOLVE_OBJECTS=(groups routers ...)
     JSON_DATA="$(nb_resolve_resources <<< "$JSON_DATA")"
     # FIXME Below leads to errors in the pretty/sort func
     # JSON_DATA="$(nb_resolve_routers <<< "$JSON_DATA")"
