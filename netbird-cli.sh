@@ -737,11 +737,14 @@ nb_create_policy() {
   fi
 
   # Resolve groups in rules
-  local src_groups dest_groups
+  local rj_arr
+  mapfile -t rj_arr < <(jq -erc '.[]' <<< "$rules_json")
 
+  local src_groups dest_groups
   local g rj rules_json_resolved=[]
   local src_group_ids dest_group_ids
-  for rj in $(jq -erc '.[]' <<< "$rules_json")
+
+  for rj in "${rj_arr[@]}"
   do
     mapfile -t src_groups < <(jq -er '.sources[]' <<< "$rj")
     mapfile -t dest_groups < <(jq -er '.destinations[]' <<< "$rj")
