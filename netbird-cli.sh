@@ -2780,7 +2780,7 @@ main() {
   # Convert JSON_DATA to array if it contains only one object
   if <<<"$JSON_DATA" jq -er '(. | type) == "object"' &>/dev/null
   then
-    JSON_DATA=$(jq -s '.' <<<"$JSON_DATA")
+    JSON_DATA=$(jq -s '.' <<< "$JSON_DATA")
   fi
 
   if [[ -n "$RESOLVE" ]]
