@@ -423,72 +423,80 @@ nb_group_id() {
   '
 }
 
-# Resolve group IDs in JSON data
-# usage: nb_resolve_groups [--inverse] [-k FIELD] <<< "$JSON_DATA"
-# shellcheck disable=SC2120
-nb_resolve_groups() {
-  local keys=("auto_groups" "groups" "peer_groups")
-  local inverse=false
+# Usage:
+#   nb_resolve OBJECT_TYPE KEY1 KEY2 KEY3 ...
+#
+# Example:
+#   nb_resolve group auto_groups groups peer_groups <<< "$JSON_DATA"
+#
+# This reads JSON from stdin and replaces each ID in the given KEY fields
+# with the full object data. If the objects share a .name field (like groups do),
+# you can easily invert the mapping (ID <-> name) by adjusting the logic below.
+nb_resolve() {
+  local object_type="$1"
+  shift
 
-  while [[ -n "$*" ]]
-  do
-    case "$1" in
-      -f|--field|-k|--key)
-        keys+=("$2")
-        shift 2
-        ;;
-      -i|--inverse)
-        inverse=true
-        shift
-        ;;
-      *)
-        echo_error "Invalid argument: $1"
-        return 1
-        ;;
-    esac
-  done
-
-  local groups
-  groups=$(nb_list_groups)
-
-  if [[ -z "$groups" ]]
+  if [[ -z "$object_type" ]]
   then
-    echo_error "Failed to list groups"
+    echo_error "Usage: nb_resolve OBJECT_TYPE KEY1 [KEY2 ...] <<< \$JSON_DATA"
+    return 1
+  fi
+
+  # The remaining positional parameters are the JSON keys to transform
+  local keys=("$@")
+
+  echo_debug "Resolving with nb_list_${object_type} - keys: ${keys[*]}"
+
+  # Fetch the object list JSON (similar to 'nb_list_groups' but for generic objects)
+  # Make sure you have a corresponding nb_list_<object_type> for each object_type.
+  local objects
+  objects="$("nb_list_${object_type}")"
+
+  echo_debug "Resolved $object_type: $objects"
+
+  if [[ -z "$objects" ]]
+  then
+    echo_error "Failed to list objects for type '$object_type'"
     return 1
   fi
 
   local keys_json
-  keys_json=$(arr_to_json "${keys[@]}")
+  keys_json="$(arr_to_json "${keys[@]}")"
 
-  echo_debug "Processing with $keys_json (inverse: $inverse)"
+  echo_debug "Resolving '$object_type' for keys: $keys_json"
 
+  # Use jq to transform each object in the JSON received via stdin.
+  # This example mimics your previous logic, building two maps:
+  #   1) object_map_by_id => key=.id, value=(entire object)
+  #   2) object_map_by_name => key=.name, value=.id
+  # Then for each item in the list we replace IDs with the entire object
+  # by iterating over the specified JSON keys in "keys_json".
   jq -er \
-    --argjson keys "$keys_json" \
-    --argjson group_data "$groups" \
-    --argjson inverse "$inverse" \
-    '
-      # Create lookup maps
-      def groups_map_by_id: ($group_data | map({key: .id, value: .}) | from_entries);
-      def groups_map_by_name: ($group_data | map({key: .name, value: .id}) | from_entries);
+    --argjson keys       "$keys_json" \
+    --argjson objectData "$objects"   '
+      def object_map_by_id:
+        ($objectData | map({ key: .id, value: . }) | from_entries);
 
-      # Perform the operation (expand or inverse) based on the inverse flag
-      def process_groups(gmap_expand; gmap_inverse; attrs; inverse):
+      # If you need "name -> id" lookups, keep or adapt this.
+      def object_map_by_name:
+        ($objectData | map({ key: .name, value: .id }) | from_entries);
+
+      def process_fields(obj; attrs; map_id):
         reduce attrs[] as $attr (
-          .;
+          obj;
           if has($attr)
           then
             .[$attr] = (
               if (.[ $attr ] | type) == "array" and all(.[ $attr ][]; type == "string")
               then
-                # Map group data based on the mode
-                if inverse
-                then
-                  .[$attr] | map(gmap_inverse[.] // .)
-                else
-                  .[$attr] | map(gmap_expand[.] // .)
-                end
+                # Array of string IDs -> replace each ID with the full object (if found)
+                .[$attr] | map( map_id[.] // . )
+              elif (.[ $attr ] | type) == "string"
+              then
+                # Single string ID -> replace with the full object if found, else leave as is
+                ( map_id[ (.[ $attr]) ] // .[$attr] )
               else
-                # If not an array, keep the original value
+                # For anything else (empty string, object, null, etc.), leave as is
                 .[$attr]
               end
             )
@@ -497,16 +505,22 @@ nb_resolve_groups() {
           end
         );
 
-      # Process attributes
       map(
-        process_groups(
-          groups_map_by_id;
-          groups_map_by_name;
-          $keys;
-          $inverse
-        )
+        process_fields(.; $keys; object_map_by_id)
       )
     '
+}
+
+nb_resolve_groups() {
+  nb_resolve groups auto_groups groups peer_groups
+}
+
+nb_resolve_routers() {
+  nb_resolve network_routers routers
+}
+
+nb_resolve_resources() {
+  nb_resolve network_resources resources
 }
 
 # https://docs.netbird.io/api/resources/groups#create-a-group
@@ -2438,8 +2452,8 @@ main() {
     n|net*)
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
-        JSON_COLUMNS=(id name description resources routers routing_peers_count)
-        COLUMN_NAMES=("Network ID" "Name" "Description" "Resources" "Routers" "Routing Peers")
+        JSON_COLUMNS=(name description resources routers routing_peers_count)
+        COLUMN_NAMES=("Name" "Description" "Resources" "Routers" "Routing Peers")
       fi
 
       [[ -z "$CUSTOM_SORT" ]] && SORT_BY=name
@@ -2783,9 +2797,12 @@ main() {
     JSON_DATA=$(jq -s '.' <<< "$JSON_DATA")
   fi
 
-  if [[ -n "$RESOLVE" ]]
+  if [[ -n "$RESOLVE" && -z "$NO_RESOLVE" ]]
   then
     JSON_DATA="$(nb_resolve_groups <<< "$JSON_DATA")"
+    JSON_DATA="$(nb_resolve_resources <<< "$JSON_DATA")"
+    # FIXME Below leads to errors in the pretty/sort func
+    # JSON_DATA="$(nb_resolve_routers <<< "$JSON_DATA")"
   fi
 
   case "$OUTPUT" in
