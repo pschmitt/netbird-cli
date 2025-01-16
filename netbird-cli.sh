@@ -242,49 +242,63 @@ to_bool() {
 colorizecolumns() {
   if [[ -n "$NO_COLOR" ]]
   then
-    cat "$@"
+    cat
     return "$?"
   fi
 
-  awk '
-    BEGIN {
-      # Define colors
-      colors[0] = "\033[36m" # cyan
-      colors[1] = "\033[32m" # green
-      colors[2] = "\033[35m" # magenta
-      colors[3] = "\033[37m" # white
-      colors[4] = "\033[33m" # yellow
-      colors[5] = "\033[34m" # blue
-      colors[6] = "\033[38m" # gray
-      colors[7] = "\033[31m" # red
-      reset = "\033[0m"
-    }
+   # Our rainbow of colors for each column
+  local colors=(
+    $'\033[36m'  # cyan
+    $'\033[32m'  # green
+    $'\033[35m'  # magenta
+    $'\033[37m'  # white
+    $'\033[33m'  # yellow
+    $'\033[34m'  # blue
+    $'\033[38m'  # gray
+    $'\033[31m'  # red
+  )
+  local reset=$'\033[0m'
+  local bold_red=$'\033[1;31m'
 
-    {
-      field_count = 0
-
-      # Process the line character by character
-      for (i = 1; i <= length($0); i++) {
-        # Current char
-        char = substr($0, i, 1)
-
-        if (char ~ /[\t]/) {
-          # If the character is a space or tab, just print it
-          printf "%s", char
-        } else {
-          # Apply color to printable characters
-          color = colors[field_count % length(colors)]
-          printf "%s%s%s", color, char, reset
-          # Move to the next field after a space or tab
-          if (substr($0, i + 1, 1) ~ /[\t]/) {
-            field_count++
-          }
-        }
+  awk \
+    -v reset="$reset" \
+    -v col_colors="${colors[*]}" \
+    -v bold_red="$bold_red" \
+    '
+      BEGIN {
+        # split on space char
+        n = split(col_colors, colors, " ")
       }
 
-      # Append trailing NL
-      printf "\n"
-    }' "$@"
+      {
+        # split on tabs
+        nfields = split($0, fields, "\t")
+
+        # colorize each field
+        for (i = 1; i <= nfields; i++){
+          fieldVal = fields[i]
+
+          # If value == "false", highlight it in bold red
+          # NOTE this will wrongly color items that are literally named "false"
+          if (fieldVal == "false") {
+            fields[i] = bold_red "FALSE" reset # uppercase for visibility
+          } else {
+            # color based on column index
+            colorIndex = (i - 1) % n
+            color = colors[colorIndex+1]
+            fields[i] = color fieldVal reset
+          }
+        }
+
+        # reassemble line
+        line = fields[1]
+        for (i = 2; i <= nfields; i++) {
+          line = line "\t" fields[i]
+        }
+
+        print line
+      }
+    '
 }
 
 curl() {
