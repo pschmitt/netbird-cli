@@ -465,7 +465,7 @@ nb_resolve_groups() {
   jq -er \
     --argjson keys "$keys_json" \
     --argjson group_data "$groups" \
-    --arg inverse "$inverse" \
+    --argjson inverse "$inverse" \
     '
       # Create lookup maps
       def groups_map_by_id: ($group_data | map({key: .id, value: .}) | from_entries);
@@ -503,7 +503,7 @@ nb_resolve_groups() {
           groups_map_by_id;
           groups_map_by_name;
           $keys;
-          $inverse == "true"
+          $inverse
         )
       )
     '
