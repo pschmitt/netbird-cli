@@ -951,8 +951,26 @@ nb_list_network_resources() {
 
   if [[ -z "$1" ]]
   then
-    echo_error "Missing network ID/name"
-    return 2
+    # echo_error "Missing network ID/name"
+    # return 2
+    local net net_id
+    local networks
+    mapfile -t networks < <(nb_list_networks | jq -cer '.[]')
+    for net in "${networks[@]}"
+    do
+      net_id=$(jq -er '.id' <<< "$net")
+      # Recurse over all
+      nb_list_network_resources "$net_id" | \
+        jq --argjson net "$net" '
+          [
+            .[] |
+            .network = $net |
+            # network_name is only here for sorting
+            .network_name = $net.name
+          ]
+        '
+    done | jq -es add
+    return "$?"
   fi
 
   if is_nb_id "$1"
@@ -1172,8 +1190,26 @@ nb_list_network_routers() {
 
   if [[ -z "$1" ]]
   then
-    echo_error "Missing network ID/name"
-    return 2
+    # echo_error "Missing network ID/name"
+    # return 2
+    local net net_id
+    local networks
+    mapfile -t networks < <(nb_list_networks | jq -cer '.[]')
+    for net in "${networks[@]}"
+    do
+      net_id=$(jq -er '.id' <<< "$net")
+      # Recurse over all
+      nb_list_network_routers "$net_id" | \
+        jq --argjson net "$net" '
+          [
+            .[] |
+            .network = $net |
+            # network_name is only here for sorting
+            .network_name = $net.name
+          ]
+        '
+    done | jq -es add
+    return "$?"
   fi
 
   if is_nb_id "$1"
@@ -2501,6 +2537,9 @@ main() {
 
       case "$ACTION" in
         list|get)
+          JSON_COLUMNS=(network.name "${JSON_COLUMNS[@]}")
+          COLUMN_NAMES=(Network "${COLUMN_NAMES[@]}")
+          [[ -z "$CUSTOM_SORT" ]] && SORT_BY=network_name
           COMMAND=nb_list_network_resources
           ;;
         create)
@@ -2553,8 +2592,8 @@ main() {
     router*|routing-peers)
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
-        JSON_COLUMNS=(id masquerade metric peer peer_groups)
-        COLUMN_NAMES=("ID" "MASQ" "Metric" "Peer" "Groups")
+        JSON_COLUMNS=(masquerade metric peer peer_groups)
+        COLUMN_NAMES=("MASQ" "Metric" "Peer" "Groups")
       fi
 
       [[ -z "$CUSTOM_SORT" ]] && SORT_BY=id
@@ -2562,6 +2601,9 @@ main() {
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_network_routers
+          JSON_COLUMNS=(network.name "${JSON_COLUMNS[@]}")
+          COLUMN_NAMES=(Network "${COLUMN_NAMES[@]}")
+          [[ -z "$CUSTOM_SORT" ]] && SORT_BY=network_name
           ;;
         create)
           if [[ -n "$HELP_ACTION" ]]
