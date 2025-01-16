@@ -2452,8 +2452,8 @@ main() {
     pol*)
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
-        JSON_COLUMNS=(id name enabled rules)
-        COLUMN_NAMES=("ID" "Name" "Enabled" "Rules")
+        JSON_COLUMNS=(name description enabled rules)
+        COLUMN_NAMES=("Name" "description" "Enabled" "Rules")
       fi
 
       [[ -z "$CUSTOM_SORT" ]] && SORT_BY=name
@@ -2493,8 +2493,8 @@ main() {
     res*)
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
-        JSON_COLUMNS=(id name type groups description address)
-        COLUMN_NAMES=("ID" "Name" "Type" "Groups" "Description" "Address")
+        JSON_COLUMNS=(name type groups description address)
+        COLUMN_NAMES=("Name" "Type" "Groups" "Description" "Address")
       fi
 
       [[ -z "$CUSTOM_SORT" ]] && SORT_BY=name
