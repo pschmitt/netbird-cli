@@ -17,8 +17,8 @@ WITH_ID_COL="${WITH_ID_COL:-}"
 
 # NOTE keys are singular, not plural
 declare -A OBJECT_RESOLVERS=(
-  [all]="groups"
-  [network]="network_resources,network_routers"
+  [network]="network_routers,network_resources,groups"
+  [route]="groups"
   [router]="groups"
 )
 
@@ -503,7 +503,6 @@ nb_resolve() {
       def object_map_by_id:
         ($objectData | map({ key: .id, value: . }) | from_entries);
 
-      # If you need "name -> id" lookups, keep or adapt this.
       def object_map_by_name:
         ($objectData | map({ key: .name, value: .id }) | from_entries);
 
@@ -1051,8 +1050,14 @@ nb_list_network_resources() {
       # Recurse over all
       {
         net_id=$(jq -er '.id' <<< "$net")
-        nb_list_network_resources "$net_id" | \
-        jq --argjson net "$net" '.[].network = $net'
+        nb_list_network_resources "$net_id" | {
+          if [[ -n "$VERBATIM" ]]
+          then
+            cat
+          else
+            jq --argjson net "$net" '.[].network = $net'
+          fi
+        }
       } &
     done | jq -es add
     local rc="$?"
@@ -1287,14 +1292,20 @@ nb_list_network_routers() {
       # Recurse over all
       {
         net_id=$(jq -er '.id' <<< "$net")
-        nb_list_network_routers "$net_id" | \
-        jq --argjson net "$net" '
-          [
-            .[] |
-            .network = $net |
-            .name = (.id  + "@" + $net.name)
-          ]
-        '
+        nb_list_network_routers "$net_id" | {
+          if [[ -n "$VERBATIM" ]]
+          then
+            cat
+          else
+            jq --argjson net "$net" '
+              [
+                .[] |
+                .network = $net |
+                .name = (.id  + "@" + $net.name)
+              ]
+            '
+          fi
+        }
       } &
     done | jq -es add
     local rc="$?"
