@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 NB_API_TOKEN="${NB_API_TOKEN:-}"
-NB_MANAGEMENT_URL="${NB_MANAGEMENT_URL:-https://api.netbird.cloud}"
+NB_MANAGEMENT_URL="${NB_MANAGEMENT_URL:-https://api.netbird.io}"
 
 COMPACT="${COMPACT:-}"
 DEBUG="${DEBUG:-}"
