@@ -1045,11 +1045,22 @@ nb_list_network_resources() {
     local net net_id
     local networks
     mapfile -t networks < <(nb_list_networks | jq -cer '.[]')
+
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    # shellcheck disable=SC2064
+    trap "rm -rf '${tmpdir}'" EXIT
+
     for net in "${networks[@]}"
     do
       # Recurse over all
+      if ! net_id=$(jq -er '.id' <<< "$net")
+      then
+        echo_warning "Failed to determine network ID of '$net'"
+        continue
+      fi
+
       {
-        net_id=$(jq -er '.id' <<< "$net")
         nb_list_network_resources "$net_id" | {
           if [[ -n "$VERBATIM" ]]
           then
@@ -1058,11 +1069,12 @@ nb_list_network_resources() {
             jq --argjson net "$net" '.[].network = $net'
           fi
         }
-      } &
-    done | jq -es add
-    local rc="$?"
+      } > "${tmpdir}/${net_id}.json" &
+    done
     wait
-    return "$rc"
+
+    jq -es add "${tmpdir}"/*.json
+    return "$?"
   fi
 
   if is_nb_id "$1"
@@ -1287,11 +1299,21 @@ nb_list_network_routers() {
     local net net_id
     local networks
     mapfile -t networks < <(nb_list_networks | jq -cer '.[]')
+
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    # shellcheck disable=SC2064
+    trap "rm -rf '${tmpdir}'" EXIT
+
     for net in "${networks[@]}"
     do
       # Recurse over all
+      if ! net_id=$(jq -er '.id' <<< "$net")
+      then
+        echo_warning "Failed to determine network ID of '$net'"
+        continue
+      fi
       {
-        net_id=$(jq -er '.id' <<< "$net")
         nb_list_network_routers "$net_id" | {
           if [[ -n "$VERBATIM" ]]
           then
@@ -1306,11 +1328,12 @@ nb_list_network_routers() {
             '
           fi
         }
-      } &
-    done | jq -es add
-    local rc="$?"
+      } > "${tmpdir}/${net_id}.json" &
+    done
     wait
-    return "$rc"
+
+    jq -es add "${tmpdir}"/*.json
+    return "$?"
   fi
 
   if is_nb_id "$1"
