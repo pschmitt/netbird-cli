@@ -86,6 +86,9 @@ usage() {
   echo "              renew ID/NAME               Renew a setup key by ID or name"
   echo "              delete ID/NAME              Delete a setup key by ID or name"
   echo
+  echo "  ssh         enable PEER                 Enable ssh access for a peer"
+  echo "              disable PEER                Disable ssh access for a peer"
+  echo
   echo "  tokens      list [USER]                 List tokens for a specific user (default: current user)"
   echo "              create USER NAME [OPTIONS]  Create a token for a user with the given name and options"
   echo "              delete USER TOKEN           Delete a token for a user by token name or ID"
@@ -727,6 +730,58 @@ nb_peer_id() {
   nb_list_peers | jq -er --arg peer_name "$peer_name" '
     .[] | select(.hostname == $peer_name) | .id
   '
+}
+
+nb_ssh_set() {
+  local peer="$1"
+  local enabled="$2"
+  echo_debug "Setting SSH access for peer $peer to $enabled"
+
+  local peer_data
+  if ! peer_data=$(nb_list_peers "$peer")
+  then
+    echo_error "Failed to retrieve peer data for '$peer'"
+    return 1
+  fi
+
+  local peer_id
+  if ! peer_id=$(jq -er '.id' <<< "$peer_data")
+  then
+    echo_error "Failed to determine peer ID of '$peer'"
+    echo_debug "peer data: ${peer_data}"
+    return 1
+  fi
+
+  local endpoint="peers/${peer_id}"
+  peer_data=$(jq -er --argjson enabled "$enabled" <<< "$peer_data" '
+    .ssh_enabled = $enabled
+  ')
+
+  nb_curl "$endpoint" -X PUT --json "$peer_data"
+}
+
+nb_ssh_enable() {
+  local peer="$1"
+  echo_info "Enabling SSH access for peer $peer"
+  if ! nb_ssh_set "$peer" true | jq -er '.ssh_enabled == true' >/dev/null
+  then
+    echo_error "Failed to enable SSH access for peer $peer"
+    return 1
+  fi
+
+  echo_success "Enabled SSH access to $peer"
+}
+
+nb_ssh_disable() {
+  local peer="$1"
+  echo_info "Disabling SSH access for peer $peer"
+  if ! nb_ssh_set "$peer" false | jq -er '.ssh_enabled == false' >/dev/null
+  then
+    echo_error "Failed to enable SSH access for peer $peer"
+    return 1
+  fi
+
+  echo_success "Disabled SSH access to $peer"
 }
 
 # https://docs.netbird.io/api/resources/policies#list-all-policies
@@ -2609,8 +2664,8 @@ main() {
       API_OBJECT="peer"
       if [[ -z "$CUSTOM_COLUMNS" ]]
       then
-        JSON_COLUMNS=(hostname ip dns_label connected version groups)
-        COLUMN_NAMES=(Hostname "Netbird IP" "DNS" Connected Version Groups)
+        JSON_COLUMNS=(hostname ip dns_label connected ssh_enabled version groups)
+        COLUMN_NAMES=(Hostname "Netbird IP" "DNS" Connected "SSH" Version Groups)
       fi
 
       case "$ACTION" in
@@ -2805,6 +2860,22 @@ main() {
         help)
           usage
           return 0
+          ;;
+      esac
+      ;;
+    ssh)
+      case "$ACTION" in
+        on|enable)
+          nb_ssh_enable "$@"
+          return "$?"
+          ;;
+        off|disable)
+          nb_ssh_disable "$@"
+          return "$?"
+          ;;
+        *)
+          echo_error "Unknown ssh action: $ACTION"
+          return 2
           ;;
       esac
       ;;
