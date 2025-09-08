@@ -68,6 +68,7 @@ usage() {
   echo "              delete ID/NAME              Delete a network resources by ID or name"
   echo
   echo "  peers       list [ID/NAME]              List peers or get a specific peer by ID or name"
+  echo "              update NAME [OPTIONS]       Update a peer"
   echo
   echo "  policy      list [ID/NAME]              List policies or get a specific policy by ID or name"
   echo "              create ARGS                 Create a policy (see --help for args)"
@@ -723,6 +724,177 @@ nb_list_peers() {
   fi
 
   nb_curl "$endpoint"
+}
+
+nb_update_peer() {
+  local peer
+  local name
+  local ssh
+  local login
+  local inact
+
+  while [[ -n "$1" ]]
+  do
+    case "$1" in
+      --name)
+        name="$2"
+        shift 2
+        ;;
+      --ssh-enabled)
+        ssh="true"
+        shift
+        ;;
+      --ssh-disabled|--no-ssh|--ssh-disable)
+        ssh="false"
+        shift
+        ;;
+      --ssh)
+        ssh="$(to_bool "$2")"
+        shift 2
+        ;;
+      --login-expiration-enabled)
+        login="true"
+        shift
+        ;;
+      --login-expiration-disabled|--no-login-expiration)
+        login="false"
+        shift
+        ;;
+      --login-expiration)
+        login="$(to_bool "$2")"
+        shift 2
+        ;;
+      --inactivity-expiration-enabled)
+        inact="true"
+        shift
+        ;;
+      --inactivity-expiration-disabled|--no-inactivity-expiration)
+        inact="false"
+        shift
+        ;;
+      --inactivity-expiration)
+        inact="$(to_bool "$2")"
+        shift 2
+        ;;
+      -*)
+        echo_error "Unknown option for peer update: $1"
+        return 2
+        ;;
+      *)
+        peer="$1"
+        shift
+        break
+        ;;
+    esac
+  done
+
+  if [[ -z "$peer" ]]
+  then
+    echo_error "Missing peer ID/name"
+    return 2
+  fi
+
+  local peer_data
+  if ! peer_data=$(nb_list_peers "$peer")
+  then
+    echo_error "Failed to retrieve peer data for '$peer'"
+    return 1
+  fi
+
+  if jq -e 'type == "array"' &>/dev/null <<< "$peer_data"
+  then
+    local count
+    count=$(jq -er 'length' <<< "$peer_data")
+    if [[ "$count" -eq 1 ]]
+    then
+      peer_data=$(jq -er '.[0]' <<< "$peer_data")
+    else
+      echo_error "Multiple peers matched '$peer' — please use an ID or unique hostname"
+      return 2
+    fi
+  fi
+
+  local peer_id
+  if ! peer_id=$(jq -er '.id' <<< "$peer_data")
+  then
+    echo_error "Failed to determine peer ID of '$peer'"
+    echo_debug "peer data: ${peer_data}"
+    return 1
+  fi
+
+  if [[ -z "$name" && -z "$ssh" && -z "$login" && -z "$inact" ]]
+  then
+    echo_warning "No update flags provided; nothing to do for ${peer_id}"
+    return 0
+  fi
+
+  local updated
+  if ! updated=$(jq -er \
+    --arg name "$name" \
+    --arg ssh "$ssh" \
+    --arg login "$login" \
+    --arg inact "$inact" '
+      .
+      | (
+        if ($name | length) > 0
+        then
+          .name = $name
+         end
+      )
+
+      | (
+        if ($ssh | length) > 0
+        then
+          .ssh_enabled = ($ssh == "true")
+        end
+      )
+
+      | (
+        if ($login | length) > 0
+        then (
+          if .login_expiration_enabled? != null
+          then
+            .login_expiration_enabled = ($login == "true")
+          end
+        ) | (
+          if .login_settings?
+          then
+            .login_settings.login_expiration_enabled = ($login == "true")
+          end
+        )
+        end
+      )
+
+      | (
+        if ($inact | length) > 0
+        then (
+          if .inactivity_expiration_enabled? != null
+          then
+            .inactivity_expiration_enabled = ($inact == "true")
+          end
+        ) | (
+          if .login_settings?
+          then
+            .login_settings.inactivity_expiration_enabled = ($inact == "true")
+          end
+        )
+        end
+      )
+    ' <<< "$peer_data")
+  then
+    echo_error "Failed to build updated peer JSON"
+    return 1
+  fi
+
+  local endpoint="peers/${peer_id}"
+  echo_info "Updating peer ${peer_id}"
+  if ! nb_curl "$endpoint" -X PUT --json "$updated"
+  then
+    echo_error "Peer update failed"
+    return 1
+  fi
+
+  echo_success "Updated peer ${peer_id}"
 }
 
 nb_peer_id() {
@@ -2671,6 +2843,9 @@ main() {
       case "$ACTION" in
         list|get)
           COMMAND=nb_list_peers
+          ;;
+        update)
+          COMMAND=nb_update_peer
           ;;
         help)
           usage
