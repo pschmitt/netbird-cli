@@ -726,6 +726,32 @@ nb_list_peers() {
   nb_curl "$endpoint"
 }
 
+nb_get_peer() {
+  local peer="$1"
+
+  if ! peer_data=$(nb_list_peers "$peer")
+  then
+    echo_error "Failed to retrieve peer data for '$peer'"
+    return 1
+  fi
+
+  if jq -e 'type == "array"' &>/dev/null <<< "$peer_data"
+  then
+    local count
+    count=$(jq -er 'length' <<< "$peer_data")
+
+    if [[ "$count" -eq 1 ]]
+    then
+      peer_data=$(jq -er '.[0]' <<< "$peer_data")
+    else
+      echo_error "Multiple peers matched '$peer' — please use an ID or unique hostname"
+      return 2
+    fi
+  fi
+
+  printf '%s\n' "$peer_data"
+}
+
 nb_update_peer() {
   local peer
   local name
@@ -795,23 +821,10 @@ nb_update_peer() {
   fi
 
   local peer_data
-  if ! peer_data=$(nb_list_peers "$peer")
+  if ! peer_data=$(nb_get_peer "$peer")
   then
     echo_error "Failed to retrieve peer data for '$peer'"
     return 1
-  fi
-
-  if jq -e 'type == "array"' &>/dev/null <<< "$peer_data"
-  then
-    local count
-    count=$(jq -er 'length' <<< "$peer_data")
-    if [[ "$count" -eq 1 ]]
-    then
-      peer_data=$(jq -er '.[0]' <<< "$peer_data")
-    else
-      echo_error "Multiple peers matched '$peer' — please use an ID or unique hostname"
-      return 2
-    fi
   fi
 
   local peer_id
