@@ -232,6 +232,120 @@ arr_to_json() {
   printf '%s\n' "$@" | jq -cRn '[inputs]'
 }
 
+column() {
+  if type -P column &>/dev/null
+  then
+    command column "$@"
+    return "$?"
+  fi
+
+  fake_column "$@"
+}
+
+fake_column() {
+  local separator=$'\t'
+  local table_mode=
+  local -a files=()
+
+  while [[ $# -gt 0 ]]
+  do
+    case "$1" in
+      -s)
+        if [[ -z "${2:-}" ]]
+        then
+          echo_error "column fallback: missing argument for -s"
+          return 1
+        fi
+        separator="$2"
+        shift 2
+        ;;
+      -t)
+        table_mode=1
+        shift
+        ;;
+      --)
+        shift
+        files+=("$@")
+        break
+        ;;
+      -*)
+        echo_error "column fallback: unsupported option '$1'"
+        return 1
+        ;;
+      *)
+        files+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  if [[ -z "$table_mode" ]]
+  then
+    echo_error "column fallback: only supports -t"
+    return 1
+  fi
+
+  case "$separator" in
+    "\\t")
+      separator=$'\t'
+      ;;
+    "\\n")
+      separator=$'\n'
+      ;;
+  esac
+
+  awk \
+    -v FS="$separator" \
+    -v sep_out="  " \
+    '
+      {
+        if (NF > max_nf) {
+          max_nf = NF
+        }
+
+        row_fields[NR] = NF
+
+        for (i = 1; i <= NF; ++i) {
+          field = $i
+          data[NR, i] = field
+
+          len = length(field)
+          if (len > width[i]) {
+            width[i] = len
+          }
+        }
+      }
+
+      END {
+        for (r = 1; r <= NR; ++r) {
+          current_nf = row_fields[r]
+          if (current_nf == 0) {
+            print ""
+            continue
+          }
+
+          for (c = 1; c <= max_nf; ++c) {
+            field = data[r, c]
+
+            if (c < max_nf) {
+              fmt = "%s"
+              if (width[c] > 0) {
+                fmt = "%-" width[c] "s"
+              }
+              printf fmt, (field == "" ? "" : field)
+              printf "%s", sep_out
+            } else {
+              printf "%s", (field == "" ? "" : field)
+            }
+          }
+
+          printf "\n"
+        }
+      }
+    ' \
+    "${files[@]}"
+}
+
 to_bool() {
   case "$1" in
     true|t|1|yes|on|y)
