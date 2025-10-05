@@ -270,6 +270,13 @@ nb_cli_load_config() {
   do
     local arg="${args[i]}"
     case "$arg" in
+      --debug)
+        DEBUG=1
+        ;;
+      --trace)
+        DEBUG=1
+        set -x
+        ;;
       --config=*)
         config_files+=("${arg#--config=}")
         ;;
@@ -288,14 +295,13 @@ nb_cli_load_config() {
 
   for path in "${config_files[@]}"
   do
-    echo_debug "Config candidate: $path"
     if [[ -f "$path" ]]
     then
       echo_debug "Loading config: $path"
       # shellcheck disable=SC1090
       source "$path"
     else
-      echo_debug "Config not found: $path"
+      echo_warning "Config not found: $path"
     fi
   done
 
@@ -2757,10 +2763,6 @@ pretty_output() {
 }
 
 main() {
-  # NOTE To see the debug messages output by nb_cli_load_config, we need to
-  # explicitly run this script with:
-  # DEBUG=1 netbird-cli ...
-  # The cli flags are only parsed later
   if ! nb_cli_load_config "$@"
   then
     return 1
