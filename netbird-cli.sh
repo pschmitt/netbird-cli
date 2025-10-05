@@ -2,6 +2,7 @@
 
 NB_API_TOKEN="${NB_API_TOKEN:-}"
 NB_MANAGEMENT_URL="${NB_MANAGEMENT_URL:-https://api.netbird.io}"
+NB_CLI_CONFIG_FILE="${NB_CLI_CONFIG_FILE:-}"
 
 COMPACT="${COMPACT:-}"
 DEBUG="${DEBUG:-}"
@@ -44,6 +45,7 @@ usage() {
   echo "  -s, --sort <col>     Sort by the specified column"
   echo "  -r, --resolve        Resolve group names for setup keys"
   echo "  --retries <int>      Number of curl retries to attempt (default: 3)"
+  echo "  --config <file>      Load additional config file"
   echo
   echo "Items and Actions:"
   echo
@@ -230,6 +232,69 @@ echo_dryrun() {
 
 arr_to_json() {
   printf '%s\n' "$@" | jq -cRn '[inputs]'
+}
+
+nb_cli_load_config() {
+  local -a config_files=()
+
+  local user_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/netbird-cli"
+  if [[ -d "$user_config_dir" ]]
+  then
+    local path
+    for path in "$user_config_dir"/*.env
+    do
+      [[ -e "$path" ]] || continue
+      config_files+=("$path")
+    done
+  fi
+
+  if [[ -d /etc/netbird-cli ]]
+  then
+    local path
+    for path in /etc/netbird-cli/*.env
+    do
+      [[ -e "$path" ]] || continue
+      config_files+=("$path")
+    done
+  fi
+
+  local config_env="${NB_CLI_CONFIG_FILE:-}"
+  if [[ -n "$config_env" ]]
+  then
+    config_files+=("$config_env")
+  fi
+
+  local -a args=("$@")
+  local i=0
+  while (( i < ${#args[@]} ))
+  do
+    local arg="${args[i]}"
+    case "$arg" in
+      --config=*)
+        config_files+=("${arg#--config=}")
+        ;;
+      --config)
+        if (( i + 1 >= ${#args[@]} ))
+        then
+          echo_error "--config requires a file path"
+          return 1
+        fi
+        config_files+=("${args[i+1]}")
+        ((i++))
+        ;;
+    esac
+    ((i++))
+  done
+
+  for path in "${config_files[@]}"
+  do
+    [[ -f "$path" ]] || continue
+    echo_debug "Loading config: $path"
+    # shellcheck disable=SC1090
+    source "$path"
+  done
+
+  return 0
 }
 
 column() {
@@ -2687,6 +2752,10 @@ pretty_output() {
 }
 
 main() {
+  if ! nb_cli_load_config "$@"
+  then
+    return 1
+  fi
   local ARGS=()
   local ACTION=list
 
@@ -2721,6 +2790,19 @@ main() {
       -t|--token)
         NB_API_TOKEN="$2"
         shift 2
+        ;;
+      --config)
+        if [[ -z "${2:-}" ]]
+        then
+          echo_error "--config requires a file path"
+          return 1
+        fi
+        NB_CLI_CONFIG_FILE="$2"
+        shift 2
+        ;;
+      --config=*)
+        NB_CLI_CONFIG_FILE="${1#--config=}"
+        shift
         ;;
       -J|--jq-args)
         JQ_ARGS+=("$2")
