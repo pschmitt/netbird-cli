@@ -2757,6 +2757,10 @@ pretty_output() {
 }
 
 main() {
+  # NOTE To see the debug messages output by nb_cli_load_config, we need to
+  # explicitly run this script with:
+  # DEBUG=1 netbird-cli ...
+  # The cli flags are only parsed later
   if ! nb_cli_load_config "$@"
   then
     return 1
