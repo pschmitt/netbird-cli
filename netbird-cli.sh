@@ -288,10 +288,15 @@ nb_cli_load_config() {
 
   for path in "${config_files[@]}"
   do
-    [[ -f "$path" ]] || continue
-    echo_debug "Loading config: $path"
-    # shellcheck disable=SC1090
-    source "$path"
+    echo_debug "Config candidate: $path"
+    if [[ -f "$path" ]]
+    then
+      echo_debug "Loading config: $path"
+      # shellcheck disable=SC1090
+      source "$path"
+    else
+      echo_debug "Config not found: $path"
+    fi
   done
 
   return 0
