@@ -253,7 +253,7 @@ fake_column() {
       -s)
         if [[ -z "${2:-}" ]]
         then
-          echo_error "column fallback: missing argument for -s"
+          echo_error "fake_column: missing argument for -s"
           return 1
         fi
         separator="$2"
@@ -269,7 +269,7 @@ fake_column() {
         break
         ;;
       -*)
-        echo_error "column fallback: unsupported option '$1'"
+        echo_error "fake_column: unsupported option '$1'"
         return 1
         ;;
       *)
@@ -281,7 +281,7 @@ fake_column() {
 
   if [[ -z "$table_mode" ]]
   then
-    echo_error "column fallback: only supports -t"
+    echo_error "fake_column: only supports -t"
     return 1
   fi
 
@@ -298,6 +298,12 @@ fake_column() {
     -v FS="$separator" \
     -v sep_out="  " \
     '
+      function display_width(str, copy) {
+        copy = str
+        gsub(/\033\[[0-9;]*m/, "", copy)
+        return length(copy)
+      }
+
       {
         if (NF > max_nf) {
           max_nf = NF
@@ -309,7 +315,7 @@ fake_column() {
           field = $i
           data[NR, i] = field
 
-          len = length(field)
+          len = display_width(field)
           if (len > width[i]) {
             width[i] = len
           }
@@ -328,11 +334,11 @@ fake_column() {
             field = data[r, c]
 
             if (c < max_nf) {
-              fmt = "%s"
-              if (width[c] > 0) {
-                fmt = "%-" width[c] "s"
+              pad = width[c] - display_width(field)
+              printf "%s", (field == "" ? "" : field)
+              while (pad-- > 0) {
+                printf " "
               }
-              printf fmt, (field == "" ? "" : field)
               printf "%s", sep_out
             } else {
               printf "%s", (field == "" ? "" : field)
